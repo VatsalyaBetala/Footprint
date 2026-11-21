@@ -1,6 +1,7 @@
 # Footprint — Gemini 4 NYC Hackathon
 
 ## Idea
+HEADLINE: "Is that 2BR actually a 2BR?" — NYC listings, verified.
 Any apartment floor plan image → a verified digital model you can query.
 Carbon reads labels/dimensions/doors, OpenCV traces exact room shapes, the
 Decisions API verifies each room against the original image, Neon picks repairs
@@ -64,8 +65,15 @@ single-Carbon-call baseline.
   "alignment_score_history": [0.61, 0.88, 0.94],
   "answers": {
     "king_bed_fits": {"room": "r1", "fits": false, "reason": "..."},
-    "clear_path": {"ok": true, "from": "r1", "to": "entrance"}
+    "clear_path": {"ok": true, "from": "r1", "to": "entrance"},
+    "legal_bedrooms": [{"room": "r2", "legal": false,
+      "checks": {"area_ge_80": false, "min_width_ge_8ft": true, "exterior_window": true,
+                 "ceiling_height": "not_checkable_from_plan"},
+      "reason": "71 sq ft < 80 sq ft minimum"}],
+    "custom_query": null
   },
+  "decision_checks": [{"room": "r1", "question": "...", "p_yes": 0.94}],
+  "cost_usd": 0.0,
   "timings_ms": {"parse": 0, "geometry": 0, "verify": 0, "solvers": 0}
 }
 ```
@@ -100,3 +108,16 @@ Person B builds against `samples/mock_model.json` until /analyze works.
 3. Lead with a surprise answer (area overstated / bed doesn't fit).
 4. 3D orbit.
 5. One slide: system vs baseline + where it breaks + what we fixed.
+
+## Impact upgrades (priority order)
+1. Legal bedroom check (solvers.py, deterministic): every room labeled bedroom must have
+   area >= 80 sq ft, min clear width >= 8 ft (shapely: shortest side of minimum rotated rectangle),
+   and a window on an exterior wall (Carbon detects windows; Decisions verifies "on exterior wall").
+   Ceiling height can't be read from a plan → report "not_checkable_from_plan", never guess.
+   Headline output: "Listed 2BR → legally 1BR + home office".
+2. Voice query: judge speaks "will a 7-foot sofa fit in the living room?" → audio to HYDROGEN →
+   JSON {object, w_ft, d_ft, clearance_ft, room} → same fit solver → drawn on plan + 3D.
+   HYDROGEN = "gemini-4-hydrogen"  # ⚠️ verify ID — fast intent parser, its only job.
+3. Decisions panel in UI: per-room questions with live probabilities, plus latency + cost badge.
+4. Proof slide line: "When Footprint says VERIFIED, it is right X% of the time (baseline: Y%)."
+Stretch, in this order: Managed Agent wrapper, then Shopify fit, then napkin-sketch input.

@@ -103,7 +103,7 @@ def _pt(p, W, H):
     if not (isinstance(p, (list, tuple)) and len(p) == 2 and all(_num(v) is not None for v in p)):
         return None
     x, y = (min(max(float(v), 0.0), 1000.0) for v in p)
-    return [round(x * W / 1000), round(y * H / 1000)]
+    return [min(W - 1, round(x * W / 1000)), min(H - 1, round(y * H / 1000))]
 
 
 def _box(b, W, H):

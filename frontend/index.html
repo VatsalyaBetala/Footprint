@@ -247,7 +247,15 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString();
 const f1 = (v) => v == null ? "—" : (+v).toFixed(1);
 const chip = (cls, t) => `<span class="chip ${cls}">${esc(t)}</span>`;
-const isBedroom = (r) => /bed|bdrm|(^|[^a-z])br([^a-z]|$)/i.test(r?.label || "");
+// Bedroom by label: English "Bedroom", "BDRM", "BR 2", "MBR"; Finnish "MH", "MH1", "makuuhuone" (CubiCasa plans).
+const isBedroom = (r) => /bed|bdrm|makuuhuone|^\s*(m?br|mh)\s*\d*\s*$|(^|[^a-z])br([^a-z]|$)/i.test(r?.label || "");
+function badUpload(file, kind) {     // say why instead of sending formats the backend can't read
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  if (kind === "plan" && (/heic|heif|pdf|svg/.test(ext) || /heic|heif|pdf|svg/.test(file.type)))
+    return `${file.name} is ${ext.toUpperCase()}; upload a PNG or JPG (screenshot the plan if needed).`;
+  if (kind === "video" && file.type && !file.type.startsWith("video/")) return `${file.name} isn't a video; upload an MP4 or MOV.`;
+  return null;
+}
 const PRESETS = [{ name: "King bed", w: 6.33, d: 6.67, c: 3 }, { name: "Queen bed", w: 5, d: 6.67, c: 3 }, { name: "Full bed", w: 4.5, d: 6.25, c: 3 },
                  { name: "Sofa 7 ft", w: 7, d: 3, c: 2.5 }, { name: "Desk", w: 5, d: 2.5, c: 2.5 }];
 const S = { plan: null, planImg: null, scans: {}, sel: null, src: "plan", view: "2d", fit: null, busy: null, form: { ...PRESETS[0], preset: 0 }, built3d: null };
@@ -283,7 +291,7 @@ $("plan-sample").onclick = async () => analyzePlan(new File([await (await fetch(
 $("new-plan").onclick = () => { $("app").hidden = true; $("empty").hidden = false; $("new-plan").hidden = true; $("plan-file").value = ""; };
 
 async function analyzePlan(file) {
-  showErr("e1", "");
+  showErr("e1", badUpload(file, "plan") || ""); if (badUpload(file, "plan")) return;
   const stop = stages($("p1"), ["Reading the plan", "Tracing rooms", "Checking each room", "Checking bedrooms"], 5500);
   try {
     const form = new FormData(); form.append("file", file);
@@ -305,7 +313,7 @@ async function pollFull(id) {                // /analyze returns a partial model
 // No floor plan: the filmed room is the whole model (same model.json shape), shown as "Your video".
 $("video-only").addEventListener("change", (e) => e.target.files[0] && scanOnly(e.target.files[0]));
 async function scanOnly(file) {
-  showErr("e1", ""); $("empty").hidden = false;
+  showErr("e1", badUpload(file, "video") || ""); $("empty").hidden = false; if (badUpload(file, "video")) return;
   const stop = stages($("p1"), ["Uploading video", "Measuring walls", "Cross-checking", "Drawing the room"], 6000);
   try {
     const form = new FormData(); form.append("file", file);
@@ -336,8 +344,12 @@ function setTile(id, cls, big, sub) { const t = $(id); t.className = `tile ${cls
 function renderAnswers() {
   if (S.videoOnly) return renderVideoAnswers();
   const m = S.plan, a = m.answers || {}, bc = a.bedroom_count || {}, area = m.area || {};
-  const beds = a.legal_bedrooms || [], listed = bc.listed ?? m.listing_claim?.bedrooms ?? null;
-  $("headline").textContent = bc.headline || `${m.rooms.length} rooms on this plan`;
+  const judged = a.legal_bedrooms || [], ids = new Set(judged.map((b) => b.room));
+  const unchecked = m.rooms.filter((r) => isBedroom(r) && !ids.has(r.id))   // labelled bedrooms the backend didn't judge (e.g. Finnish MH)
+    .map((r) => ({ room: r.id, label: r.label, legal: null, unchecked: true }));
+  const beds = [...judged, ...unchecked], listed = bc.listed ?? m.listing_claim?.bedrooms ?? null;
+  $("headline").textContent = unchecked.length ? `Plan labels ${beds.length} bedroom${beds.length > 1 ? "s" : ""}; ${unchecked.length} couldn't be checked`
+                                               : bc.headline || `${m.rooms.length} rooms on this plan`;
   $("t-beds").querySelector("small").textContent = `Is it really a ${listed ?? beds.length}BR?`;
   $("t-area").querySelector("small").textContent = "Is it really the size listed?";
   // bedrooms: legal / failing / not yet confirmable, per bedroom
@@ -393,11 +405,14 @@ function renderRoom() {
   const r = planRoom(); if (!r) { $("room").innerHTML = ""; return; }
   const b = bedEntry(r.id), scan = scanOf(r.id);
   const size = r.printed_dims_ft ? `${r.printed_dims_ft.map((d) => +(+d).toFixed(1)).join(" × ")} ft` : null;
-  let html = `<div class="rhead"><h3>${esc(r.label)}</h3>${b ? bedChip(b) : ""}</div>
+  const unchecked = !b && isBedroom(r) && !S.videoOnly;
+  let html = `<div class="rhead"><h3>${esc(r.label)}</h3>${b ? bedChip(b) : unchecked ? chip("warn", "NOT CHECKED") : ""}</div>
     <div class="rsub">${S.videoOnly ? "measured from your video · no floor plan" :
       `${[size, r.area_sqft != null ? `${n0(r.area_sqft)} sq ft` : null].filter(Boolean).join(" · ") || "no dimensions on the plan"}
       · outline ${r.verified ? "confirmed against the plan image" : "estimated"}`}</div>`;
   if (b) html += bedroomSection(b, r);
+  else if (unchecked) html += `<div class="sec"><h4>NYC legal bedroom?</h4><div class="note" style="margin-top:0">Labelled “${esc(r.label)}” (a bedroom),
+    but the legal check didn't run on it, so no verdict. Filming it below still measures its size and ceiling.</div></div>`;
   html += measureSection(r, scan) + fitSection(r, scan);
   $("room").innerHTML = html;
   wireRoom(r);
@@ -503,6 +518,7 @@ function wireRoom(r) {
 // ================= video scan (attached to the selected room) =================
 $("scan-file").addEventListener("change", (e) => e.target.files[0] && scanRoom(e.target.files[0]));
 async function scanRoom(file) {
+  if (badUpload(file, "video")) return showErr("e2", badUpload(file, "video"));
   const roomId = S.sel; S.scanning = roomId; renderRoom();
   try {
     const form = new FormData(); form.append("file", file);
@@ -571,8 +587,12 @@ function render3d(m, room, video, cad) {
   if (S.key3d === key) return;                 // nothing changed: no rebuild, no camera swoop
   S.key3d = key;
   window.Footprint3D.clearFurniture();
-  if (f && m.scale_px_per_ft) window.Footprint3D.showFurniture({ room: room.id, fits: f.fits, w_ft: f.w_ft, d_ft: f.d_ft, h_ft: 2,
-    center_px: f.center_px || (f.poly ? centroid(f.poly) : null), rotation_deg: f.rotation_deg || 0 });
+  if (f && m.scale_px_per_ft) {               // three3d draws w along x: hand it the footprint already turned
+    const turned = (f.rotation_deg || 0) % 180 === 90, name = f.name || "";
+    window.Footprint3D.showFurniture({ room: room.id, fits: f.fits, w_ft: turned ? f.d_ft : f.w_ft, d_ft: turned ? f.w_ft : f.d_ft, h_ft: 2,
+      kind: /bed/i.test(name) ? "bed" : /sofa/i.test(name) ? "sofa" : "box", clearance_ft: f.clearance_ft || 0,
+      center_px: f.center_px || (f.poly ? centroid(f.poly) : null), rotation_deg: 0 });
+  }
   window.Footprint3D.overview();
 }
 function roomClass(m, r, selId) {
@@ -622,7 +642,7 @@ function setFit(fit, path, q, m, room, video, heard) {
     const [cx, cy] = centroid(room.polygon), w = q.w_ft * m.scale_px_per_ft / 2, d = q.d_ft * m.scale_px_per_ft / 2;
     poly = [[cx - w, cy - d], [cx + w, cy - d], [cx + w, cy + d], [cx - w, cy + d]];
   }
-  S.fit = { room: S.sel, video, fits: fit.fits, reason: fit.reason, poly, path, heard, w_ft: q.w_ft, d_ft: q.d_ft,
+  S.fit = { room: S.sel, video, fits: fit.fits, reason: fit.reason, poly, path, heard, w_ft: q.w_ft, d_ft: q.d_ft, clearance_ft: q.clearance_ft,
             name: S.form.preset != null ? PRESETS[S.form.preset].name : "your furniture",
             center_px: fit.center_px, rotation_deg: fit.rotation_deg };
   renderRoom(); renderCanvas();
@@ -670,8 +690,8 @@ async function toWav(blob) {                  // browser recordings are webm/ogg
 }
 </script>
 <!-- ?v= stamps make browsers fetch the current 3D modules instead of a cached older copy -->
-<script type="module" src="three3d.js?v=1622"></script>
-<script type="module" src="cad3d.js?v=1622"></script>
+<script type="module" src="three3d.js?v=1640"></script>
+<script type="module" src="cad3d.js?v=1640"></script>
 <script>
 document.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => {
   const [label, w, d, h] = b.dataset.add.split("|"); if (!window.FootprintCAD) return;

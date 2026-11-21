@@ -1,0 +1,50 @@
+{
+  "placeholder": true,
+  "note": "PLACEHOLDER numbers for UI development only. Real numbers come from eval/run_eval.py -> eval/results.json.",
+  "seed": 42,
+  "dataset": "CubiCasa5K (skv4 labels + phungpx COCO images)",
+  "n_test": 50,
+  "n_dev": 10,
+  "models": {"carbon": "gemini-4-carbon", "neon": "gemini-4-neon", "decisions": "gemini-decision-1"},
+  "iou_headline": "buffered",
+  "systems": {
+    "B1": {"name": "Baseline B1", "desc": "Single Carbon call -> room polygons"},
+    "v1": {"name": "Footprint v1", "desc": "Carbon + OpenCV + Decisions verify + Neon repair"},
+    "v2": {"name": "Footprint v2", "desc": "v1 + fixes for the top-2 DEV failure categories"}
+  },
+  "headline": {"verified_precision": {"B1": 0.62, "v1": 0.84, "v2": 0.91}},
+  "metrics": [
+    {"key": "room_iou", "label": "Room shape IoU", "fmt": "ratio", "higher_is_better": true, "B1": 0.58, "v1": 0.74, "v2": 0.79},
+    {"key": "count_acc", "label": "Room count exact", "fmt": "pct", "higher_is_better": true, "B1": 0.46, "v1": 0.62, "v2": 0.70},
+    {"key": "count_mae", "label": "Room count error", "fmt": "num", "higher_is_better": false, "B1": 1.6, "v1": 0.9, "v2": 0.7},
+    {"key": "type_acc", "label": "Room type accuracy", "fmt": "pct", "higher_is_better": true, "B1": 0.81, "v1": 0.86, "v2": 0.88},
+    {"key": "window_acc", "label": "Bedroom window check", "fmt": "pct", "higher_is_better": true, "B1": 0.64, "v1": 0.83, "v2": 0.86},
+    {"key": "area_err_pct", "label": "Total area error", "fmt": "pct_err", "higher_is_better": false, "B1": 14.2, "v1": 7.9, "v2": 6.1},
+    {"key": "abstain_acc", "label": "Correct abstention", "fmt": "pct", "higher_is_better": true, "B1": 0.10, "v1": 0.90, "v2": 0.95},
+    {"key": "latency_p50_s", "label": "Latency p50", "fmt": "sec", "higher_is_better": false, "B1": 6.1, "v1": 17.4, "v2": 18.2},
+    {"key": "cost_usd", "label": "Cost per plan", "fmt": "usd", "higher_is_better": false, "B1": 0.004, "v1": 0.019, "v2": 0.021}
+  ],
+  "by_variant": [
+    {"variant": "clean",       "n": 50, "B1": {"room_iou": 0.58, "verified_precision": 0.62}, "v2": {"room_iou": 0.79, "verified_precision": 0.91}},
+    {"variant": "phone_photo", "n": 20, "B1": {"room_iou": 0.41, "verified_precision": 0.49}, "v2": {"room_iou": 0.66, "verified_precision": 0.85}},
+    {"variant": "rotated",     "n": 20, "B1": {"room_iou": 0.52, "verified_precision": 0.57}, "v2": {"room_iou": 0.74, "verified_precision": 0.89}},
+    {"variant": "lowres",      "n": 20, "B1": {"room_iou": 0.47, "verified_precision": 0.55}, "v2": {"room_iou": 0.61, "verified_precision": 0.82}},
+    {"variant": "cropped",     "n": 20, "B1": {"room_iou": 0.50, "verified_precision": 0.58}, "v2": {"room_iou": 0.70, "verified_precision": 0.86}},
+    {"variant": "nyc",         "n": 20, "B1": {"room_iou": null, "verified_precision": 0.55}, "v2": {"room_iou": null, "verified_precision": 0.88}}
+  ],
+  "coverage_curve": {
+    "B1": [[1.0, 0.52], [0.9, 0.55], [0.8, 0.58], [0.7, 0.60], [0.6, 0.62], [0.5, 0.63], [0.4, 0.64], [0.3, 0.64], [0.2, 0.65]],
+    "v2": [[1.0, 0.71], [0.9, 0.78], [0.8, 0.85], [0.7, 0.89], [0.6, 0.91], [0.5, 0.93], [0.4, 0.95], [0.3, 0.96], [0.2, 0.97]]
+  },
+  "failures": [
+    {"category": "open_plan_merge", "count": 11, "example": "Kitchen + living traced as one region (no wall between them)", "fixed_in": "v2"},
+    {"category": "door_gap_leak", "count": 8, "example": "Flood fill escaped through an unsealed 90 cm door gap", "fixed_in": "v2"},
+    {"category": "text_blocks_fill", "count": 6, "example": "Room label text stopped the fill; polygon has a hole", "fixed_in": null},
+    {"category": "finnish_label_misread", "count": 4, "example": "\"VH\" (vaatehuone, walk-in closet) read as a bedroom", "fixed_in": null},
+    {"category": "missed_room", "count": 3, "example": "Sauna not detected", "fixed_in": null}
+  ],
+  "changes_v2": [
+    {"category": "open_plan_merge", "change": "Split regions holding 2+ Carbon seeds along the shortest cut", "delta": "+0.05 IoU on DEV"},
+    {"category": "door_gap_leak", "change": "Close kernel sized from the detected door width instead of a fixed 7 px", "delta": "-6 leaks on DEV"}
+  ]
+}

@@ -1,61 +1,751 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Footprint</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Footprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* Blueprint Precision tokens. three3d.js reads --panel --line --ok --bad --warn --accent. */
+:root {
+  --bg: #f8f9fa; --panel: #ffffff; --ink: #0f172a; --muted: #475569; --line: #e2e8f0; --line-strong: #cbd5e1;
+  --accent: #2563eb; --accent-tint: #eaedff; --accent-ink: #003ea8;
+  --ok: #10b981; --ok-ink: #047857; --warn: #f59e0b; --warn-ink: #b45309; --bad: #ef4444; --bad-ink: #b91c1c;
+  --sys: #006c49; --base: #ffb95f; --base-ink: #784b00; --base-tint: #f2f3ff;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --float: 0 4px 16px rgba(15, 23, 42, .06);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 14px/20px var(--sans); padding-bottom: 88px; }
+.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+.app { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+/* header */
+.top { display: flex; align-items: center; gap: 10px; padding: 16px 0; position: sticky; top: 0; z-index: 5;
+       background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); }
+.logo { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+        display: grid; place-items: center; }
+.title { font-weight: 600; font-size: 20px; letter-spacing: -.01em; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 9999px;
+        font: 500 11px/14px var(--mono); letter-spacing: .03em; border: 1px solid transparent; white-space: nowrap; }
+.chip.nyc { background: var(--accent-tint); color: var(--accent-ink); border-radius: 6px; padding: 0 6px; }
+.chip.ok { background: color-mix(in srgb, var(--ok) 10%, white); color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 40%, white); }
+.chip.warn { background: color-mix(in srgb, var(--warn) 10%, white); color: var(--warn-ink); border-color: color-mix(in srgb, var(--warn) 45%, white); }
+.chip.bad { background: color-mix(in srgb, var(--bad) 10%, white); color: var(--bad-ink); border-color: color-mix(in srgb, var(--bad) 40%, white); }
+.chip.info { background: var(--accent-tint); color: var(--accent-ink); }
+.chip.base { background: color-mix(in srgb, var(--base) 35%, white); color: var(--base-ink); }
+.spacer { flex: 1; }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px;
+       border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-weight: 600; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-height: 48px; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* cards & layout */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.card h2 { margin: 0; font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -.005em; }
+.card .sub { color: var(--muted); font-size: 13px; line-height: 18px; margin-top: 2px; }
+.label { font: 600 12px/16px var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.metric .head { flex-wrap: wrap; gap: 6px; }
+body { overflow-x: hidden; } .reason, .verdict-text { overflow-wrap: anywhere; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 -4px; }
+.section-head h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+[data-tab] { display: none; }
+[data-tab].active { display: block; }
+
+/* verdict */
+.verdict { border-left: 3px solid var(--bad); }
+.verdict.ok { border-left-color: var(--ok); } .verdict.warn { border-left-color: var(--warn); } .verdict.pending { border-left-color: var(--line-strong); }
+.verdict-text { font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -.015em; margin: 6px 0 4px; }
+.verdict-text em { font-style: normal; color: var(--bad-ink); }
+.verdict.ok .verdict-text em { color: var(--ok-ink); } .verdict.warn .verdict-text em { color: var(--warn-ink); }
+
+/* metric pair (claimed vs verified) */
+.metric { border-radius: 12px; padding: 16px; border: 1px solid var(--line); background: var(--panel); }
+.metric.tint { background: var(--base-tint); border-color: transparent; }
+.metric .big { font: 600 32px/38px var(--mono); letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin: 8px 0 2px; }
+.metric .big.ok { color: var(--sys); } .metric .big.bad { color: var(--bad-ink); } .metric .big.base { color: var(--base-ink); }
+.metric .cap { color: var(--muted); }
+.metric .head { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+
+/* upload & progress */
+.upload { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.stages { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.stage { font: 500 11px/14px var(--mono); padding: 5px 10px; border-radius: 9999px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.stage.on { background: var(--accent-tint); color: var(--accent-ink); border-color: transparent; }
+.stage.done { color: var(--ok-ink); }
+.stage.on::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+
+/* plan canvas */
+.canvas { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow: hidden;
+          background: var(--panel) radial-gradient(var(--line) 1px, transparent 1px) 0 0 / 16px 16px; }
+.canvas svg { width: 100%; height: auto; display: block; }
+.room { fill-opacity: .18; stroke-width: 3; cursor: pointer; opacity: 0; animation: pop .4s forwards; transition: fill-opacity .15s; }
+.room.hl, .room:hover { fill-opacity: .4; }
+.room.ok { fill: var(--ok); stroke: var(--ok); }
+.room.flag { fill: var(--warn); stroke: var(--warn); }
+.room.unverified { fill: var(--warn); stroke: var(--warn); stroke-dasharray: 9 6; fill-opacity: .1; }
+.room.fail { fill: var(--bad); stroke: var(--bad); }
+@keyframes pop { to { opacity: 1; } }
+.rlabel { font: 600 13px var(--sans); fill: var(--ink); pointer-events: none; opacity: 0; animation: pop .4s forwards; }
+.lbl-bg { fill: #fff; stroke: var(--ok); stroke-width: 1.5; }
+.lbl-bg.fail { stroke: var(--bad); } .lbl-bg.flag, .lbl-bg.unverified { stroke: var(--warn); stroke-dasharray: 4 3; }
+.rlabel .m { font: 600 12px var(--mono); }
+.rlabel .u { fill: var(--warn-ink); font: 600 11px var(--mono); }
+.door { fill: var(--accent); stroke: #fff; stroke-width: 2; }
+.win { fill: #5a8fb5; }
+.entr { fill: none; stroke: var(--accent); stroke-width: 3; }
+.cpath { fill: none; stroke: var(--accent); stroke-width: 3; stroke-dasharray: 1 7; stroke-linecap: round; }
+.cpath.bad { stroke: var(--bad); }
+.fit-rect { stroke-width: 2.5; fill-opacity: .35; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 12px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; border: 2px solid; }
+
+/* score */
+.score-row { display: flex; align-items: baseline; justify-content: space-between; }
+.score-num { font: 600 32px/38px var(--mono); letter-spacing: -.02em; }
+.bar { height: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 9999px; overflow: hidden; }
+.bar > div { height: 100%; width: 0; border-radius: 9999px; transition: width .7s ease; }
+.iters { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+
+/* rows */
+.rows > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.rows > div:first-child { border-top: 0; padding-top: 4px; }
+.rows .v { font: 500 16px/22px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.rows .k { color: var(--muted); }
+.rows [data-room] { cursor: pointer; }
+.room-row { border-left: 3px solid var(--ok); padding-left: 10px !important; margin-left: -2px; }
+.room-row.fail { border-left-color: var(--bad); } .room-row.flag, .room-row.unverified { border-left-color: var(--warn); }
+
+/* legal cards */
+.legal { border-left: 3px solid var(--ok); }
+.legal.bad { border-left-color: var(--bad); } .legal.unknown { border-left-color: var(--warn); }
+.checks { margin: 12px 0 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.check .ic { font-weight: 700; text-align: center; }
+.check .ic.y { color: var(--ok-ink); } .check .ic.n { color: var(--bad-ink); } .check .ic.q { color: var(--warn-ink); }
+.check .v { font: 500 13px var(--mono); color: var(--muted); }
+.reason { color: var(--muted); font-size: 13px; line-height: 18px; }
+
+/* decisions */
+.dec-room { padding: 10px 0; border-top: 1px solid var(--line); }
+.dec-room:first-child { border-top: 0; padding-top: 0; }
+.dec-room .name { font-weight: 600; display: flex; justify-content: space-between; align-items: center; cursor: pointer; list-style: none; }
+.dec-room .name::-webkit-details-marker { display: none; }
+.dec-room[open] .name { margin-bottom: 6px; }
+.prob { display: grid; grid-template-columns: 1fr 48px; gap: 4px 10px; align-items: center; font-size: 13px; margin: 6px 0; color: var(--muted); }
+.prob b { font: 600 13px var(--mono); text-align: right; color: var(--ink); }
+.prob .bar { grid-column: 1 / -1; height: 5px; }
+
+/* benchmark bars (eval) */
+.bench { padding: 12px 0; }
+.bench .top-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.bench .top-line > span:first-child { font-size: 16px; }
+.bench .vals { font: 500 13px var(--mono); color: var(--muted); white-space: nowrap; }
+.bench .top-line > span:first-child { min-width: 0; }
+.bench .bar { height: 10px; border: 0; background: var(--accent-tint); margin-top: 6px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: right; padding: 10px 8px; border-top: 1px solid var(--line); font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+th { font: 600 12px var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border-top: 0; }
+th:first-child, td:first-child { text-align: left; font-family: var(--sans); }
+td.best { color: var(--sys); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+.fail-row { padding: 12px 0; border-top: 1px solid var(--line); }
+.fail-row:first-child { border-top: 0; }
+.fail-row .l1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fail-row .cat { font: 600 13px var(--mono); }
+.placeholder-banner { background: repeating-linear-gradient(-45deg, #fff7ed, #fff7ed 10px, #ffedd5 10px, #ffedd5 20px);
+                      border: 1px solid var(--warn); color: var(--warn-ink); border-radius: 12px; padding: 10px 14px; font: 600 12px var(--mono); letter-spacing: .03em; }
+
+/* fit */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field input, .field select { height: 48px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 0 12px; }
+.field input { font-family: var(--mono); }
+.presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.presets button { height: 36px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-size: 13px; }
+.presets button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* 3D (ids/classes used by three3d.js) */
+#view3d { position: relative; height: 62vh; min-height: 380px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+#view3d canvas { display: block; }
+.labels3d { position: absolute; top: 0; left: 0; pointer-events: none; }
+.label3d { pointer-events: auto; cursor: pointer; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+           border-radius: 9999px; padding: 3px 10px; font: 500 11px var(--mono); display: flex; gap: 6px; white-space: nowrap; box-shadow: var(--float); }
+.label3d span { color: var(--muted); }
+.label3d.fail { border-color: var(--bad); color: var(--bad-ink); }
+.label3d.unverified { border-style: dashed; border-color: var(--warn); }
+.label3d.entrance { color: var(--accent-ink); font-weight: 700; pointer-events: none; }
+.view3d-caption { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; background: rgba(15,23,42,.88);
+                  color: #fff; padding: 8px 16px; border-radius: 8px; font: 600 13px var(--mono); letter-spacing: .03em; white-space: nowrap;
+                  max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+.view3d-caption.fail { background: color-mix(in srgb, var(--bad) 85%, black); }
+
+/* tab bar */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); box-shadow: var(--float); }
+.tabbar .in { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); }
+.tabbar button { border: 0; background: none; padding: 10px 0 12px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+                 cursor: pointer; color: var(--ink); font: 500 11px var(--mono); letter-spacing: .03em; }
+.tabbar button svg { width: 24px; height: 24px; }
+.tabbar button.active { color: var(--accent); }
+.tip-mock { font: 600 11px var(--mono); color: var(--warn-ink); }
+.muted { color: var(--muted); }
+</style>
 </head>
 <body>
-  <header>
-    <div class="brand">Footprint <span>Is that 2BR actually a 2BR?</span></div>
-    <div class="controls">
-      <label class="btn">Upload plan<input id="file" type="file" accept="image/*" hidden></label>
-      <button id="replay" class="btn ghost">Replay</button>
-      <span id="source" class="badge"></span>
-    </div>
+<div class="app">
+  <header class="top">
+    <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h8v9M11 3v5M15 12h6"/></svg></div>
+    <span class="title">Footprint</span><span class="chip nyc">NYC</span>
+    <span class="spacer"></span>
+    <span id="mock-badge" class="chip warn" hidden>MOCK DATA</span>
   </header>
 
-  <main>
-    <section class="stage">
-      <div id="headline" class="headline"></div>
-      <div class="plan-wrap">
-        <svg id="plan" xmlns="http://www.w3.org/2000/svg"></svg>
-        <div id="tip" class="tip" hidden></div>
-      </div>
-      <div class="score">
-        <div class="score-label">Alignment score</div>
-        <div class="score-bar"><div id="score-fill"></div></div>
-        <div id="score-num" class="score-num">–</div>
-        <div id="score-steps" class="score-steps"></div>
-      </div>
-      <div class="view3d-wrap">
-        <div class="view3d-bar">
-          <span class="score-label">3D · drag to orbit · click a room to step inside</span>
-          <button id="view3d-reset" class="btn ghost small">Overview</button>
+  <!-- ============ VERIFY ============ -->
+  <section data-tab="verify" class="active">
+    <div class="stack">
+      <div class="card">
+        <div class="upload">
+          <label class="btn primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+            Upload floor plan<input id="file" type="file" accept="image/*" hidden></label>
+          <div><div style="font-weight:600">Is that 2BR actually a 2BR?</div>
+            <div class="sub" id="source-line">Any listing floor plan → verified model</div></div>
         </div>
-        <div id="view3d">
-          <div id="view3d-caption" class="view3d-caption" hidden></div>
+        <div class="stages" id="stages" hidden></div>
+      </div>
+
+      <div class="card verdict pending" id="verdict">
+        <div class="label">Verdict</div>
+        <div class="verdict-text" id="verdict-text">—</div>
+        <div class="reason" id="verdict-sub"></div>
+      </div>
+
+      <div class="grid2" id="pair"></div>
+
+      <div class="cols">
+        <div class="stack">
+          <div class="canvas"><svg id="plan-verify"></svg></div>
+          <div class="card">
+            <div class="score-row"><span class="label">Alignment score</span><span class="score-num" id="score-num">–</span></div>
+            <div class="bar" style="margin-top:10px"><div id="score-fill" style="background:var(--accent)"></div></div>
+            <div class="iters" id="score-iters"></div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="section-head"><h3>Legal bedrooms</h3><span class="chip info">NYC minimums</span></div>
+          <div class="stack" id="legal"></div>
+          <div class="section-head"><h3>Decisions</h3><span class="chip info" id="cost-badge"></span></div>
+          <div class="card" id="decisions"></div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <aside>
-      <div class="card"><h3>Square footage</h3><div id="area"></div></div>
-      <div class="card"><h3>Answers</h3><div id="answers"></div></div>
-      <div class="card"><h3>Legal bedrooms</h3><div id="legal"></div></div>
-      <div class="card"><h3>Rooms</h3><div id="rooms"></div></div>
-      <div class="card"><h3>Decision checks</h3><div id="decisions"></div></div>
-      <div class="card meta" id="meta"></div>
-    </aside>
-  </main>
+  <!-- ============ 2D MODEL ============ -->
+  <section data-tab="plan">
+    <div class="cols">
+      <div class="stack">
+        <div class="canvas"><svg id="plan-2d"></svg></div>
+        <div class="legend">
+          <span><i style="border-color:var(--ok);background:color-mix(in srgb,var(--ok) 20%,white)"></i>verified</span>
+          <span><i style="border-color:var(--warn);border-style:dashed"></i>unverified / flagged</span>
+          <span><i style="border-color:var(--bad);background:color-mix(in srgb,var(--bad) 20%,white)"></i>fails a check</span>
+          <span><i style="border-color:var(--accent);border-style:dotted;border-radius:50%"></i>clear path to entrance</span>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card"><div class="label">Square footage</div><div class="rows" id="area" style="margin-top:8px"></div></div>
+        <div class="card"><div class="label">Rooms</div><div class="rows" id="rooms" style="margin-top:8px"></div></div>
+        <div class="card"><div class="label">Answers</div><div class="rows" id="answers" style="margin-top:8px"></div></div>
+      </div>
+    </div>
+  </section>
 
-  <script type="importmap">
-    { "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
-  </script>
-  <script src="app.js"></script>
-  <script type="module" src="three3d.js"></script>
+  <!-- ============ 3D ============ -->
+  <section data-tab="3d">
+    <div class="section-head" style="margin-bottom:12px"><span class="muted">Drag to orbit · click a room to step inside</span>
+      <button id="view3d-reset" class="btn">Overview</button></div>
+    <div id="view3d"><div id="view3d-caption" class="view3d-caption" hidden></div></div>
+  </section>
+
+  <!-- ============ FIT ============ -->
+  <section data-tab="fit">
+    <div class="cols">
+      <div class="card stack" id="fit-form">
+        <div><h2>Will it fit?</h2><div class="sub" id="fit-sub">Checked against the traced room shape, with clearance.</div></div>
+        <div class="presets" id="presets"></div>
+        <div class="grid2">
+          <label class="field"><span class="label">Width ft</span><input id="fit-w" type="number" step="0.1" min="0.5"></label>
+          <label class="field"><span class="label">Depth ft</span><input id="fit-d" type="number" step="0.1" min="0.5"></label>
+          <label class="field"><span class="label">Clearance ft</span><input id="fit-c" type="number" step="0.5" min="0"></label>
+          <label class="field"><span class="label">Room</span><select id="fit-room"></select></label>
+        </div>
+        <button class="btn primary" id="fit-go">Check fit</button>
+        <div id="fit-out"></div>
+      </div>
+      <div class="canvas"><svg id="plan-fit"></svg></div>
+    </div>
+  </section>
+
+  <!-- ============ EVAL / PROOF ============ -->
+  <section data-tab="eval">
+    <div class="stack" id="proof"></div>
+  </section>
+</div>
+
+<nav class="tabbar"><div class="in" id="tabbar">
+  <button data-go="verify" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>Verify</button>
+  <button data-go="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 4h18v16H3zM3 12h9v8M12 4v4M16 12h5"/></svg>2D Model</button>
+  <button data-go="3d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg>3D View</button>
+  <button data-go="fit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 11V8a2 2 0 012-2h10a2 2 0 012 2v3"/><path d="M3 13a2 2 0 014 0v1h10v-1a2 2 0 014 0v4H3zM5 17v2M19 17v2"/></svg>Fit</button>
+  <button data-go="eval"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>Eval</button>
+</div></nav>
+
+<script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+<script>
+// Footprint UI. Serve from repo root: `python3 -m http.server 5500` → http://localhost:5500/frontend/
+// ?api=http://host:port (default http://localhost:8000) · ?mock=1 skip backend · ?mock=noscale load the no-scale mock
+const params = new URLSearchParams(location.search);
+const API = params.get("api") || "http://localhost:8000";
+const MOCKS = { ok: ["../samples/mock_model.json", "mock_plan.svg"],
+                noscale: ["../samples/mock_model_noscale.json", "mock_plan_nodims.svg"] };
+const RESULTS = ["../eval/results.json", "../samples/mock_results.json"];
+const STAGES = ["Reading plan…", "Tracing rooms…", "Verifying…", "Checking code…"];
+const PRESETS = [
+  { name: "King bed", w: 6.33, d: 6.67, c: 3 }, { name: "Queen bed", w: 5, d: 6.67, c: 3 },
+  { name: "Sofa 7 ft", w: 7, d: 3, c: 1.5 }, { name: "Desk", w: 4, d: 2, c: 3 }, { name: "Custom", w: null, d: null, c: 1.5 },
+];
+const NOT_INFO_FLAGS = new Set(["no_printed_dims", "no_scale"]); // informational, not warnings
+
+let model = null, imageUrl = null, isMock = false, timers = [], tab = "verify", built3d = null, fitResult = null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const n0 = (v) => (v == null ? "—" : Math.round(v).toLocaleString());
+const n1 = (v) => (v == null ? "—" : (+v).toFixed(1));
+const chip = (cls, t) => `<span class="chip ${cls}">${esc(t)}</span>`;
+const room = (id) => model.rooms.find((r) => r.id === id || r.label === id);
+const rname = (id) => room(id)?.label || id;
+const noScale = () => model.scale_status === "undetermined" || model.scale_px_per_ft == null;
+const isBedroom = (r) => /bed/i.test(r.label);
+async function getJSON(url, opts) { const r = await fetch(url, opts); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }
+const withTimeout = (ms) => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal; };
+
+// ---------------- loading ----------------
+async function loadMock(kind = "ok") {
+  const [m, img] = MOCKS[kind] || MOCKS.ok;
+  model = await getJSON(m); imageUrl = img; isMock = true;
+  render();
+}
+
+async function analyze(file) {
+  imageUrl = URL.createObjectURL(file);
+  $("stages").hidden = false;
+  let i = 0;
+  const tick = () => { $("stages").innerHTML = STAGES.map((s, j) => `<span class="stage ${j < i ? "done" : j === i ? "on" : ""}">${j < i ? "✓ " : ""}${s}</span>`).join(""); };
+  tick();
+  const iv = setInterval(() => { if (i < STAGES.length - 1) { i++; tick(); } }, 5500);
+  setVerdict("pending", "Analyzing…", "This takes about 15–25 seconds.");
+  try {
+    const form = new FormData();
+    form.append("image", file); // ⚠️ uncertain — confirm field name with server.py
+    model = await getJSON(`${API}/analyze`, { method: "POST", body: form, signal: withTimeout(90000) });
+    isMock = false;
+  } catch (err) {
+    console.warn("analyze failed → mock", err);
+    const [m, img] = MOCKS.ok;
+    model = await getJSON(m); imageUrl = img; isMock = true;
+  }
+  clearInterval(iv); i = STAGES.length; tick();
+  setTimeout(() => ($("stages").hidden = true), 1500);
+  render();
+}
+
+// ---------------- render ----------------
+function render() {
+  timers.forEach(clearTimeout); timers = [];
+  $("mock-badge").hidden = !isMock;
+  $("source-line").textContent = isMock ? "Backend offline — showing mock data" : `Live · ${API}`;
+  drawPlan($("plan-verify"), { anim: true });
+  drawPlan($("plan-2d"), { anim: false, paths: true });
+  drawPlan($("plan-fit"), { anim: false });
+  animateScore(); renderVerdict(); renderPair(); renderLegal(); renderDecisions();
+  renderArea(); renderRooms(); renderAnswers(); renderFit();
+  built3d = null;
+  if (tab === "3d") build3d();
+}
+
+function status(r) {
+  const a = model.answers || {};
+  const bedFail = a.king_bed_fits?.fits === false && a.king_bed_fits.room === r.id;
+  const illegal = (a.legal_bedrooms || []).some((b) => b.room === r.id && b.legal === false);
+  if (illegal || bedFail) return "fail";
+  if (!r.verified) return "unverified";
+  if ((r.flags || []).some((f) => !NOT_INFO_FLAGS.has(f))) return "flag";
+  return "ok";
+}
+
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  parent && parent.appendChild(n); return n;
+}
+function centroid(poly) { // area-weighted, so L-shapes label inside
+  let a = 0, cx = 0, cy = 0;
+  poly.forEach(([x1, y1], i) => { const [x2, y2] = poly[(i + 1) % poly.length]; const f = x1 * y2 - x2 * y1; a += f; cx += (x1 + x2) * f; cy += (y1 + y2) * f; });
+  if (!a) return poly[0];
+  return [cx / (3 * a), cy / (3 * a)];
+}
+
+function drawPlan(svg, { anim, paths }) {
+  svg.innerHTML = "";
+  const { w, h } = model.image;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  el("image", { href: imageUrl, x: 0, y: 0, width: w, height: h }, svg);
+  const stagger = anim ? Math.min(260, 1800 / Math.max(1, model.rooms.length)) : 0;
+  model.rooms.forEach((r, i) => {
+    if (!r.polygon?.length) return;
+    const st = status(r), delay = `animation-delay:${i * stagger}ms`;
+    const p = el("polygon", { points: r.polygon.map((q) => q.join(",")).join(" "), class: `room ${st}`, style: delay, "data-id": r.id }, svg);
+    p.addEventListener("mouseenter", () => highlight(r.id, true));
+    p.addEventListener("mouseleave", () => highlight(r.id, false));
+    p.addEventListener("click", () => { go("3d"); setTimeout(() => window.Footprint3D?.focusRoom(r.id), 50); });
+    const [cx, cy] = centroid(r.polygon);
+    const sub = !r.verified ? "unverified" : r.area_sqft != null ? `${Math.round(r.area_sqft)} sq ft` : "? sq ft";
+    const bw = Math.max(r.label.length * 7.4, sub.length * 7.2) + 18; // estimate: hidden tabs can't getBBox
+    const g = el("g", { class: "rlabel", style: delay }, svg);
+    el("rect", { x: cx - bw / 2, y: cy - 21, width: bw, height: 40, rx: 8, class: `lbl-bg ${st}` }, g);
+    const t = el("text", { x: cx, y: cy - 4, "text-anchor": "middle" }, g);
+    t.textContent = r.label;
+    const t2 = el("text", { x: cx, y: cy + 12, "text-anchor": "middle", class: r.verified ? "m" : "u" }, g);
+    t2.textContent = sub;
+  });
+  if (paths) clearPaths().forEach((c) => c.path?.length > 1 &&
+    el("polyline", { points: c.path.map((q) => q.join(",")).join(" "), class: `cpath ${c.ok === false ? "bad" : ""}` }, svg));
+  (model.windows || []).forEach((wi) => wi.center && el("rect", { x: wi.center[0] - 5, y: wi.center[1] - 5, width: 10, height: 10, rx: 2, class: "win" }, svg));
+  (model.doors || []).forEach((d) => d.center && el("circle", { cx: d.center[0], cy: d.center[1], r: 6, class: "door" }, svg));
+  if (model.entrance) el("circle", { cx: model.entrance[0], cy: model.entrance[1], r: 12, class: "entr" }, svg);
+  if (svg.id === "plan-fit" && fitResult) drawFitRect(svg);
+}
+function highlight(id, on) { document.querySelectorAll(`.room[data-id="${id}"]`).forEach((p) => p.classList.toggle("hl", on)); }
+function clearPaths() { const c = model.answers?.clear_path; return Array.isArray(c) ? c : c ? [c] : []; }
+
+function animateScore() {
+  const hist = model.alignment_score_history || [];
+  $("score-fill").style.width = "0"; $("score-num").textContent = "–"; $("score-iters").innerHTML = "";
+  hist.forEach((s, i) => timers.push(setTimeout(() => {
+    $("score-fill").style.width = `${s * 100}%`;
+    $("score-num").textContent = s.toFixed(2);
+    $("score-iters").innerHTML = hist.slice(0, i + 1).map((v, j) =>
+      chip(j === i ? "info" : "", `iter ${j + 1} · ${v.toFixed(2)}`)).join("");
+  }, 400 + i * 900)));
+}
+
+// ---------------- verdict ----------------
+function setVerdict(cls, text, sub) {
+  $("verdict").className = `card verdict ${cls}`;
+  $("verdict-text").innerHTML = text; $("verdict-sub").textContent = sub || "";
+}
+function renderVerdict() {
+  const a = model.answers || {}, area = model.area || {};
+  const beds = a.legal_bedrooms || [];
+  const listed = model.listing_claim?.bedrooms ?? beds.length; // ⚠️ listed-bedroom count isn't in the contract yet
+  const legal = beds.filter((b) => b.legal === true).length;
+  const illegal = beds.filter((b) => b.legal === false);
+  const unknown = beds.filter((b) => b.legal == null);
+  const measured = area.from_geometry ?? area.from_printed;
+  let v;
+  if (noScale()) {
+    const parts = [];
+    if (illegal.length) parts.push(illegal.map((b) => `${rname(b.room)} fails anyway: ${b.reason}.`).join(" "));
+    if (unknown.length) parts.push(`${unknown.map((b) => rname(b.room)).join(", ")} can't be confirmed without a scale.`);
+    v = ["warn", `<em>Scale unknown</em>, no dimensions printed`, `We don't guess square footage. ${parts.join(" ")}`];
+  } else if (illegal.length) {
+    const rest = illegal.map((b) => { const r = room(b.room); return r?.area_sqft != null ? `${Math.round(r.area_sqft)} sq ft room` : "non-legal room"; });
+    v = ["bad", `Listed ${listed}BR → <em>${legal} legal bedroom${legal === 1 ? "" : "s"}</em> + ${rest.join(" + ")}`,
+         illegal.map((b) => `${rname(b.room)}: ${b.reason}`).join(" · ")];
+  } else if (area.claim_scope === "same_floor" && area.listing_claim && measured && area.listing_claim > measured * 1.1) {
+    v = ["bad", `Listed ${n0(area.listing_claim)} sq ft → <em>measured ${n0(measured)} sq ft</em>`, `${Math.round((area.listing_claim / measured - 1) * 100)}% more than the plan shows.`];
+  } else if (area.claim_scope === "ambiguous" && area.listing_claim) {
+    v = ["warn", `Listed ${n0(area.listing_claim)} sq ft · <em>this floor ${n0(measured)} sq ft</em>`, "The listing figure may cover other floors, so no verdict on area."];
+  } else if (a.king_bed_fits?.fits === false) {
+    v = ["bad", `<em>A king bed doesn't fit</em> in ${esc(rname(a.king_bed_fits.room))}`, a.king_bed_fits.reason];
+  } else {
+    v = ["ok", `<em>Checks out</em>: ${legal} legal bedroom${legal === 1 ? "" : "s"}`, unknown.length ? `${unknown.length} bedroom(s) unconfirmed.` : ""];
+  }
+  setVerdict("pending", "…", "");
+  timers.push(setTimeout(() => setVerdict(...v), 400 + (model.alignment_score_history?.length || 1) * 900));
+}
+
+function renderPair() {
+  const a = model.answers || {}, area = model.area || {};
+  const beds = a.legal_bedrooms || [];
+  const listed = model.listing_claim?.bedrooms ?? beds.length;
+  const legal = beds.filter((b) => b.legal === true).length;
+  const unknown = beds.filter((b) => b.legal == null).length;
+  const brText = unknown ? `${legal}–${legal + unknown}BR` : `${legal}BR`;
+  const mismatch = legal + unknown < listed;
+  const measured = noScale() ? null : (area.from_geometry ?? area.from_printed);
+  const overstated = area.claim_scope === "same_floor" && area.listing_claim && measured && area.listing_claim > measured * 1.1;
+  $("pair").innerHTML = `
+    <div class="metric tint"><div class="head">${model.listing_claim?.bedrooms != null ? "Listing says" : "Plan labels"} ${chip("base", "CLAIM")}</div>
+      <div class="big base">${listed}BR</div>
+      <div class="cap mono">${area.listing_claim != null ? `${n0(area.listing_claim)} sq ft` : "no sq ft claimed"}</div></div>
+    <div class="metric"><div class="head">Footprint verified ${mismatch ? chip("bad", "MISMATCH") : unknown ? chip("warn", "UNCONFIRMED") : chip("ok", "MATCH")}</div>
+      <div class="big ${mismatch ? "bad" : unknown ? "" : "ok"}">${brText}</div>
+      <div class="cap mono">${measured != null ? `${n0(measured)} sq ft${overstated ? " · claim overstated" : ""}` : "scale unknown"}${unknown ? ` · ${unknown} unconfirmed` : ""}</div></div>`;
+}
+
+// ---------------- legal bedrooms ----------------
+function renderLegal() {
+  const beds = model.answers?.legal_bedrooms || [];
+  const fmtVal = { area_ge_80: (r) => r?.area_sqft != null ? `${Math.round(r.area_sqft)} sq ft` : "no scale",
+                   min_width_ge_8ft: (r) => r?.printed_dims_ft ? `${Math.min(...r.printed_dims_ft).toFixed(1)} ft` : noScale() ? "no scale" : "",
+                   exterior_window: () => "", ceiling_height: () => "" };
+  const name = { area_ge_80: "Area ≥ 80 sq ft", min_width_ge_8ft: "Width ≥ 8 ft", exterior_window: "Window on exterior wall", ceiling_height: "Ceiling height" };
+  $("legal").innerHTML = beds.length ? beds.map((b) => {
+    const r = room(b.room), cls = b.legal === true ? "" : b.legal === false ? "bad" : "unknown";
+    const c = b.legal === true ? chip("ok", "LEGAL") : b.legal === false ? chip("bad", "NOT LEGAL") : chip("warn", "CAN'T CONFIRM");
+    const rows = Object.entries(b.checks || {}).map(([k, v]) => {
+      const ic = v === true ? ["y", "✓"] : v === false ? ["n", "✗"] : ["q", "?"];
+      const val = typeof v === "string" ? "not checkable" : v == null ? "not checkable" : (fmtVal[k]?.(r) || "");
+      return `<div class="check"><span class="ic ${ic[0]}">${ic[1]}</span><span>${name[k] || k}</span><span class="v">${esc(val)}</span></div>`;
+    }).join("");
+    return `<div class="card legal ${cls}" data-room="${esc(b.room)}"><div class="score-row"><h2>${esc(rname(b.room))}</h2>${c}</div>
+      <div class="checks">${rows}</div><div class="reason">${esc(b.reason)}</div></div>`;
+  }).join("") : `<div class="card reason">No rooms labeled bedroom.</div>`;
+  wireHover("legal");
+}
+
+// ---------------- decisions ----------------
+function renderDecisions() {
+  const by = {};
+  (model.decision_checks || []).forEach((c) => (by[c.room] = by[c.room] || []).push(c));
+  const color = (p) => (p >= 0.8 ? "var(--ok)" : p >= 0.6 ? "var(--warn)" : "var(--bad)");
+  $("decisions").innerHTML = Object.entries(by).map(([rid, cs]) => {
+    const r = room(rid);
+    const minP = Math.min(...cs.map((c) => c.p_yes)), open = !r?.verified || minP < 0.6;
+    return `<details class="dec-room" data-room="${esc(rid)}" ${open ? "open" : ""}><summary class="name"><span>${esc(rname(rid))}</span>
+      <span><span class="mono muted" style="font-size:12px;margin-right:8px">min ${Math.round(minP * 100)}%</span>${r ? (r.verified ? chip("ok", "VERIFIED") : chip("warn", "UNVERIFIED")) : ""}</span></summary>
+      ${cs.map((c) => `<div class="prob"><span>${esc(c.question)}</span><b>${Math.round(c.p_yes * 100)}%</b>
+        <div class="bar"><div style="width:${c.p_yes * 100}%;background:${color(c.p_yes)}"></div></div></div>`).join("")}</details>`;
+  }).join("") || `<span class="reason">No checks.</span>`;
+  const t = model.timings_ms || {}, total = Object.values(t).reduce((s, v) => s + (v || 0), 0);
+  $("cost-badge").textContent = `${(total / 1000).toFixed(1)} s · $${(model.cost_usd ?? 0).toFixed(3)}`;
+  $("cost-badge").title = Object.entries(t).map(([k, v]) => `${k} ${v} ms`).join(" · ");
+  wireHover("decisions");
+}
+
+// ---------------- 2D tab ----------------
+function renderArea() {
+  const a = model.area || {};
+  let verdict = "";
+  const measured = a.from_geometry ?? a.from_printed;
+  if (noScale()) verdict = chip("warn", "SCALE UNKNOWN · NO DIMENSIONS PRINTED");
+  else if (a.listing_claim == null || a.claim_scope == null) verdict = `<span class="reason">No listing claim on the plan.</span>`;
+  else if (a.claim_scope === "ambiguous") verdict = `<span class="reason">Claim may cover more than this floor: no verdict.</span>`;
+  else if (measured) {
+    const d = (a.listing_claim - measured) / measured;
+    verdict = d > 0.1 ? chip("bad", `CLAIM ${Math.round(d * 100)}% OVER`) : d < -0.1 ? chip("warn", `CLAIM ${Math.round(-d * 100)}% UNDER`) : chip("ok", "CLAIM MATCHES");
+  }
+  $("area").innerHTML = `
+    <div><span>From printed dims</span><span class="v">${a.from_printed != null ? `${n0(a.from_printed)} sq ft` : "—"}</span></div>
+    <div><span>From traced geometry</span><span class="v">${a.from_geometry != null ? `${n0(a.from_geometry)} sq ft` : "—"}</span></div>
+    <div><span>Listing claims</span><span class="v">${a.listing_claim != null ? `${n0(a.listing_claim)} sq ft` : "—"}</span></div>
+    <div><span class="k">${a.printed_coverage != null ? `Printed dims cover ${Math.round(a.printed_coverage * 100)}% of area` : ""}</span>${verdict}</div>
+    <div><span class="k">Scale</span><span class="v">${model.scale_px_per_ft != null ? `${n1(model.scale_px_per_ft)} px/ft` : "—"} · ${esc(model.scale_status)}</span></div>`;
+}
+function renderRooms() {
+  $("rooms").innerHTML = model.rooms.map((r) => {
+    const st = status(r);
+    const dims = r.printed_dims_ft ? `${r.printed_dims_ft[0]}×${r.printed_dims_ft[1]}` : "";
+    return `<div class="room-row ${st}" data-room="${esc(r.id)}"><span>${esc(r.label)}<br><span class="k mono" style="font-size:11px">${dims ? dims + " ft printed · " : ""}conf ${r.confidence != null ? (+r.confidence).toFixed(2) : "—"}${(r.flags || []).length ? " · " + esc(r.flags.join(", ")) : ""}</span></span>
+      <span class="v">${r.area_sqft != null ? `${n1(r.area_sqft)}` : "—"}<span class="k" style="font-size:12px"> sq ft</span></span></div>`;
+  }).join("");
+  wireHover("rooms");
+}
+function renderAnswers() {
+  const a = model.answers || {}, out = [];
+  const yn = (v, y, n) => (v === true ? chip("ok", y) : v === false ? chip("bad", n) : chip("warn", "CAN'T TELL"));
+  if (a.king_bed_fits) out.push(`<div data-room="${esc(a.king_bed_fits.room)}"><span>King bed in ${esc(rname(a.king_bed_fits.room))}<br><span class="reason">${esc(a.king_bed_fits.reason)}</span></span>${yn(a.king_bed_fits.fits, "FITS", "DOESN'T FIT")}</div>`);
+  clearPaths().forEach((c) => out.push(`<div data-room="${esc(c.from)}"><span>Clear path ${esc(rname(c.from))} → ${esc(c.to)}${c.reason ? `<br><span class="reason">${esc(c.reason)}</span>` : ""}</span>${yn(c.ok, "CLEAR", "BLOCKED")}</div>`));
+  $("answers").innerHTML = out.join("") || `<div class="reason">No answers.</div>`;
+  wireHover("answers");
+}
+function wireHover(id) {
+  $(id).querySelectorAll("[data-room]").forEach((n) => {
+    n.addEventListener("mouseenter", () => highlight(n.dataset.room, true));
+    n.addEventListener("mouseleave", () => highlight(n.dataset.room, false));
+  });
+}
+
+// ---------------- fit ----------------
+let preset = 0;
+function renderFit() {
+  const off = noScale();
+  $("fit-sub").textContent = off ? "Can't measure: no scale on this plan." : "Checked against the traced room shape, with clearance.";
+  $("fit-form").querySelectorAll("input,select,button").forEach((n) => (n.disabled = off));
+  $("presets").innerHTML = PRESETS.map((p, i) => `<button data-i="${i}" class="${i === preset ? "on" : ""}">${p.name}</button>`).join("");
+  $("presets").querySelectorAll("button").forEach((b) => (b.onclick = () => { preset = +b.dataset.i; applyPreset(); renderFit(); }));
+  const cur = $("fit-room").value;
+  $("fit-room").innerHTML = model.rooms.map((r) => `<option value="${esc(r.id)}">${esc(r.label)}</option>`).join("");
+  const firstBed = model.rooms.find(isBedroom);
+  $("fit-room").value = room(cur) ? cur : firstBed?.id || model.rooms[0]?.id;
+  if (!$("fit-w").value) applyPreset();
+  if (off) { $("fit-out").innerHTML = chip("warn", "CAN'T MEASURE: NO SCALE ON THIS PLAN"); fitResult = null; }
+}
+function applyPreset() { const p = PRESETS[preset]; if (p.w) { $("fit-w").value = p.w; $("fit-d").value = p.d; } $("fit-c").value = p.c; }
+async function checkFit() {
+  const r = room($("fit-room").value);
+  const body = { model_id: model.model_id ?? null, w_ft: +$("fit-w").value, d_ft: +$("fit-d").value, clearance_ft: +$("fit-c").value, room_label: r?.label };
+  $("fit-out").innerHTML = `<span class="reason">Checking…</span>`;
+  try {
+    const res = await getJSON(`${API}/query`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: withTimeout(30000) });
+    // ⚠️ uncertain — /query response shape not in the contract yet; reading fits/reason/center_px/rotation_deg
+    fitResult = { room: r.id, w_ft: body.w_ft, d_ft: body.d_ft, fits: res.fits ?? res.fit?.fits ?? null,
+                  reason: res.reason ?? res.fit?.reason ?? "", center_px: res.center_px ?? res.fit?.center_px ?? null,
+                  rotation_deg: res.rotation_deg ?? res.fit?.rotation_deg ?? 0 };
+    $("fit-out").innerHTML = `<div class="score-row">${fitResult.fits ? chip("ok", "FITS") : fitResult.fits === false ? chip("bad", "DOESN'T FIT") : chip("warn", "CAN'T TELL")}</div><div class="reason" style="margin-top:8px">${esc(fitResult.reason)}</div>`;
+    drawPlan($("plan-fit"), { anim: false });
+    try { window.Footprint3D?.showFurniture(fitResult); } catch (e) { console.warn(e); }
+  } catch (err) {
+    fitResult = null;
+    $("fit-out").innerHTML = `${chip("warn", "BACKEND OFFLINE")}<div class="reason" style="margin-top:8px">/query isn't reachable (${esc(err.message)}). Fit is only computed by the solver, never estimated here.</div>`;
+  }
+}
+function drawFitRect(svg) {
+  const s = model.scale_px_per_ft, r = room(fitResult.room);
+  if (!s || !r) return;
+  const [cx, cy] = fitResult.center_px || centroid(r.polygon), w = fitResult.w_ft * s, d = fitResult.d_ft * s;
+  const c = fitResult.fits ? "var(--ok)" : "var(--bad)";
+  el("rect", { x: cx - w / 2, y: cy - d / 2, width: w, height: d, class: "fit-rect", fill: c, stroke: c,
+               transform: `rotate(${fitResult.rotation_deg || 0} ${cx} ${cy})` }, svg);
+}
+$("fit-go").onclick = checkFit;
+
+// ---------------- proof / eval ----------------
+const SYS_ORDER = ["B0", "B1", "B2", "v1", "v2"];
+function fmtMetric(m, v) {
+  if (v == null) return "—";
+  return { pct: `${(v * 100).toFixed(1)}%`, pct_err: `${(+v).toFixed(1)}%`, ratio: (+v).toFixed(2), sec: `${(+v).toFixed(1)} s`,
+           usd: `$${(+v).toFixed(3)}`, num: (+v).toFixed(1) }[m.fmt] ?? String(v);
+}
+async function loadProof() {
+  let res = null, src = null;
+  for (const url of RESULTS) { try { res = await getJSON(url); src = url; break; } catch {} }
+  if (!res) { $("proof").innerHTML = `<div class="card reason">No results yet: run eval/run_eval.py.</div>`; return; }
+  const best = res.systems?.v2 && res.metrics.some((m) => m.v2 != null) ? "v2" : "v1";
+  const sysCols = SYS_ORDER.filter((s) => res.metrics.some((m) => m[s] != null));
+  const vp = res.headline?.verified_precision || {};
+  const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
+  const curve = res.coverage_curve || {};
+  const html = [];
+  if (res.placeholder) html.push(`<div class="placeholder-banner">PLACEHOLDER: not real results. Run eval/run_eval.py to replace (${esc(src)}).</div>`);
+  html.push(`<div class="section-head" style="margin:0"><span class="chip info">n = ${res.n_test} CubiCasa5K test plans · seed ${res.seed}</span>
+    <span class="chip">${esc(src.split("/").pop())}</span></div>`);
+  html.push(`<div class="grid2">
+    <div class="metric"><div class="head">${esc(res.systems?.[best]?.name || "Footprint")} ${chip("ok", "✓")}</div>
+      <div class="big ok">${pct(vp[best])}</div><div class="cap">right when it says VERIFIED</div>
+      ${vp.B1 != null && vp[best] != null ? `<div style="margin-top:10px">${chip("ok", `+${Math.round((vp[best] - vp.B1) * 100)} pts vs base`)}</div>` : ""}</div>
+    <div class="metric tint"><div class="head">${esc(res.systems?.B1?.name || "Baseline")}</div>
+      <div class="big base">${pct(vp.B1)}</div><div class="cap">right at confidence ≥ 0.8</div>
+      <div style="margin-top:10px">${chip("base", "Single Carbon call")}</div></div></div>`);
+  html.push(`<div class="card"><div class="verdict-text" style="font-size:20px;line-height:26px;margin:0">When Footprint says VERIFIED, it's right ${pct(vp[best])} <span class="muted">(baseline ${pct(vp.B1)})</span></div></div>`);
+  // benchmark bars
+  const bench = res.metrics.filter((m) => ["ratio", "pct", "pct_err"].includes(m.fmt)).map((m) => {
+    const a = m[best], b = m.B1, top = m.fmt === "pct_err" ? Math.max(a || 0, b || 0, 1) : 1;
+    return `<div class="bench"><div class="top-line"><span>${esc(m.label)} ${m.higher_is_better ? "" : chip("info", "Lower is better")}</span>
+      <span class="vals">${fmtMetric(m, a)} vs ${fmtMetric(m, b)}</span></div>
+      <div class="bar"><div style="width:${((a ?? 0) / top) * 100}%;background:var(--sys)"></div></div>
+      <div class="bar"><div style="width:${((b ?? 0) / top) * 100}%;background:var(--base)"></div></div></div>`;
+  }).join("");
+  html.push(`<div class="card"><div class="score-row"><div><h2 style="font-size:20px">Benchmark comparison</h2><div class="sub">${esc(res.systems?.[best]?.name)} vs ${esc(res.systems?.B1?.name)}</div></div>
+    <span class="mono" style="font-size:13px"><span class="dot" style="background:var(--sys)"></span>${best} <span class="dot" style="background:var(--base);margin-left:8px"></span>B1</span></div>${bench}</div>`);
+  // full table
+  html.push(`<div class="card"><h2>System vs baseline</h2><div class="table-wrap"><table><tr><th>Metric</th>${sysCols.map((s) => `<th>${s}</th>`).join("")}</tr>
+    ${res.metrics.map((m) => {
+      const vals = sysCols.map((s) => m[s]).filter((v) => v != null);
+      const bestV = m.higher_is_better ? Math.max(...vals) : Math.min(...vals);
+      return `<tr><td>${esc(m.label)}</td>${sysCols.map((s) => `<td class="${m[s] === bestV && vals.length > 1 ? "best" : ""}">${fmtMetric(m, m[s])}</td>`).join("")}</tr>`;
+    }).join("")}</table></div><div class="reason" style="margin-top:8px">IoU headline: ${esc(res.iou_headline || "raw")} (our polygons trace inner wall edges; ground truth follows wall centrelines).</div></div>`);
+  // per input type
+  html.push(`<div class="card"><h2>By input type</h2><div class="sub">Messy copies apply the same transform to the ground truth.</div><div class="table-wrap"><table>
+    <tr><th>Input</th><th>n</th><th>IoU B1</th><th>IoU ${best}</th><th>Verified B1</th><th>Verified ${best}</th></tr>
+    ${(res.by_variant || []).map((v) => `<tr><td>${esc(v.variant.replace("_", " "))}</td><td>${v.n}</td>
+      <td>${v.B1?.room_iou != null ? v.B1.room_iou.toFixed(2) : "—"}</td><td class="best">${v[best]?.room_iou != null ? v[best].room_iou.toFixed(2) : "—"}</td>
+      <td>${pct(v.B1?.verified_precision)}</td><td class="best">${pct(v[best]?.verified_precision)}</td></tr>`).join("")}</table></div></div>`);
+  // coverage vs accuracy
+  html.push(`<div class="card"><h2>Coverage vs accuracy</h2><div class="sub">Sweep the confidence threshold: how many rooms you answer for vs how often you're right.</div>${coverageSVG(curve, best)}</div>`);
+  // where it breaks
+  const maxF = Math.max(1, ...(res.failures || []).map((f) => f.count));
+  html.push(`<div class="card"><h2>Where it breaks</h2><div class="sub">Failure categories on DEV, auto-tagged.</div><div style="margin-top:8px">
+    ${(res.failures || []).map((f) => `<div class="fail-row"><div class="l1"><span class="cat">${esc(f.category)}</span>
+      <span>${f.fixed_in ? chip("ok", `FIXED IN ${f.fixed_in.toUpperCase()}`) : chip("warn", "OPEN")} <span class="mono" style="margin-left:6px">${f.count}</span></span></div>
+      <div class="bar" style="margin:8px 0 6px;height:6px"><div style="width:${(f.count / maxF) * 100}%;background:${f.fixed_in ? "var(--ok)" : "var(--warn)"}"></div></div>
+      <div class="reason">${esc(f.example)}</div></div>`).join("")}</div></div>`);
+  if (res.changes_v2?.length) html.push(`<div class="card"><h2>What we changed in v2</h2><div class="rows" style="margin-top:8px">
+    ${res.changes_v2.map((c) => `<div><span>${esc(c.change)}<br><span class="k mono" style="font-size:11px">${esc(c.category)}</span></span><span class="v" style="color:var(--sys)">${esc(c.delta)}</span></div>`).join("")}</div></div>`);
+  $("proof").innerHTML = html.join("");
+}
+function coverageSVG(curve, best) {
+  const W = 560, H = 260, L = 44, R = 16, T = 14, B = 36, y0 = 0.4;
+  const X = (c) => L + c * (W - L - R), Y = (a) => T + (1 - (a - y0) / (1 - y0)) * (H - T - B);
+  const line = (pts, color) => pts?.length ? `<polyline fill="none" stroke="${color}" stroke-width="2.5" points="${pts.map(([c, a]) => `${X(c)},${Y(a)}`).join(" ")}"/>` +
+    pts.map(([c, a]) => `<circle cx="${X(c)}" cy="${Y(a)}" r="3" fill="${color}"/>`).join("") : "";
+  let g = "";
+  for (let a = y0; a <= 1.0001; a += 0.1) g += `<line x1="${L}" x2="${W - R}" y1="${Y(a)}" y2="${Y(a)}" stroke="#e2e8f0"/><text x="${L - 8}" y="${Y(a) + 4}" text-anchor="end" font-size="11" font-family="JetBrains Mono" fill="#475569">${Math.round(a * 100)}%</text>`;
+  for (let c = 0.2; c <= 1.0001; c += 0.2) g += `<text x="${X(c)}" y="${H - B + 18}" text-anchor="middle" font-size="11" font-family="JetBrains Mono" fill="#475569">${Math.round(c * 100)}%</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:10px">${g}
+    <text x="${(W + L) / 2}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#475569" font-family="Inter">coverage (share of rooms answered)</text>
+    ${line(curve.B1, "#ffb95f")}${line(curve[best], "#006c49")}
+    <g font-family="JetBrains Mono" font-size="11"><circle cx="${L + 12}" cy="${T + 8}" r="4" fill="#006c49"/><text x="${L + 20}" y="${T + 12}">${best}</text>
+    <circle cx="${L + 52}" cy="${T + 8}" r="4" fill="#ffb95f"/><text x="${L + 60}" y="${T + 12}">B1</text></g></svg>`;
+}
+
+// ---------------- tabs & 3D ----------------
+function go(t) {
+  tab = t;
+  document.querySelectorAll("[data-tab]").forEach((s) => s.classList.toggle("active", s.dataset.tab === t));
+  document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("active", b.dataset.go === t));
+  if (t === "3d") build3d();
+  if (t === "eval") loadProof();
+  scrollTo({ top: 0 });
+}
+// Build 3D only when its tab is visible (a hidden container has 0 size), once per model; the swoop then plays on screen.
+function build3d() {
+  if (built3d === model) return;
+  try {
+    if (window.Footprint3D) { window.Footprint3D.build(model); built3d = model; }
+    else window.__pending3d = model;
+  } catch (err) { console.warn("3D build failed", err); }
+}
+document.querySelectorAll("#tabbar button").forEach((b) => (b.onclick = () => go(b.dataset.go)));
+$("file").addEventListener("change", (e) => e.target.files[0] && analyze(e.target.files[0]));
+
+(async () => {
+  const m = params.get("mock");
+  if (m) await loadMock(m === "noscale" ? "noscale" : "ok");
+  else try { await getJSON(`${API}/health`, { signal: withTimeout(2000) }); $("source-line").textContent = `Backend live · ${API}: upload a plan`; }
+  catch {} finally { await loadMock("ok"); } // something always renders; uploading replaces it with a live result
+  if (params.get("tab")) go(params.get("tab"));
+})();
+</script>
+<script type="module" src="three3d.js"></script>
 </body>
 </html>

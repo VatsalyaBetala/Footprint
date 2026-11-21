@@ -1,0 +1,17 @@
+{
+  "_how_to": "One entry per real NYC listing plan. Save the image as data/nyc_plans/<id>.png (gitignored, never committed). Copy dims exactly as printed, converted to decimal feet (11'3\" -> 11.25). Use null when something isn't printed. Delete this example entry when you add real ones.",
+  "plans": [
+    {
+      "id": "nyc01",
+      "source_url": "https://streeteasy.com/...",
+      "listed_bedrooms": 2,
+      "listed_sqft": 850,
+      "messiness": "clean | no_dims | photo | flex_room",
+      "bedrooms": [
+        {"printed_label": "BEDROOM 1", "dims_ft": [12.0, 11.25], "exterior_window": true},
+        {"printed_label": "BEDROOM 2", "dims_ft": [7.9, 9.0], "exterior_window": false}
+      ],
+      "other_rooms_count": 4
+    }
+  ]
+}

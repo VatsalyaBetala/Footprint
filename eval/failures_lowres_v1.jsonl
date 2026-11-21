@@ -1,0 +1,35 @@
+{"plan_id": "13281", "category": "missed_room", "detail": "GT room not traced"}
+{"plan_id": "13281", "category": "missed_room", "detail": "GT room not traced"}
+{"plan_id": "13281", "category": "extra_room", "detail": "'PARVEKE' matches no GT room"}
+{"plan_id": "13281", "category": "open_plan_merge", "detail": "'OH + KT' spans 3 GT rooms"}
+{"plan_id": "3024", "category": "leak_oversize", "detail": "room: IoU 0.43, area x2.30"}
+{"plan_id": "3024", "category": "extra_room", "detail": "'LASITETTU PARVEKE' matches no GT room"}
+{"plan_id": "3024", "category": "open_plan_merge", "detail": "'ET' spans 4 GT rooms"}
+{"plan_id": "11664", "category": "extra_room", "detail": "'PARVEKE' matches no GT room"}
+{"plan_id": "541", "category": "extra_room", "detail": "'TERASSI' matches no GT room"}
+{"plan_id": "8389", "category": "leak_oversize", "detail": "room: IoU 0.44, area x2.23"}
+{"plan_id": "8389", "category": "missed_room", "detail": "GT room not traced"}
+{"plan_id": "8389", "category": "extra_room", "detail": "'PARVEKE' matches no GT room"}
+{"plan_id": "8389", "category": "open_plan_merge", "detail": "'Bathroom' spans 2 GT rooms"}
+{"plan_id": "7780", "category": "undersize", "detail": "room: IoU 0.32, area x0.33"}
+{"plan_id": "7780", "category": "open_plan_merge", "detail": "'K' spans 2 GT rooms"}
+{"plan_id": "4847", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "4847", "category": "extra_room", "detail": "'Hall' matches no GT room"}
+{"plan_id": "8189", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "8189", "category": "extra_room", "detail": "'OH' matches no GT room"}
+{"plan_id": "8189", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "20021", "category": "missed_room", "detail": "GT room not traced"}
+{"plan_id": "20021", "category": "open_plan_merge", "detail": "'H + KT' spans 2 GT rooms"}
+{"plan_id": "6716", "category": "missed_room", "detail": "GT room not traced"}
+{"plan_id": "6716", "category": "open_plan_merge", "detail": "'oh/k' spans 2 GT rooms"}
+{"plan_id": "6716", "category": "open_plan_merge", "detail": "'kh' spans 2 GT rooms"}
+{"plan_id": "6716", "category": "extra_room", "detail": "'Patio' matches no GT room"}
+{"plan_id": "1339", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "1339", "category": "open_plan_merge", "detail": "'Hallway' spans 3 GT rooms"}
+{"plan_id": "1339", "category": "extra_room", "detail": "'MH' matches no GT room"}
+{"plan_id": "12787", "category": "missed_room", "detail": "GT room not traced"}
+{"plan_id": "12787", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "12787", "category": "open_plan_merge", "detail": "'Living / Dining / Kitchen' spans 2 GT rooms"}
+{"plan_id": "772", "category": "extra_room", "detail": "'parveke' matches no GT room"}
+{"plan_id": "9093", "category": "extra_room", "detail": "'PARV.' matches no GT room"}
+{"plan_id": "6596", "category": "extra_room", "detail": "'TERASSI' matches no GT room"}

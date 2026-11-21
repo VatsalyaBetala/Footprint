@@ -1,0 +1,307 @@
+{
+ "placeholder": false,
+ "split": "rotated",
+ "seed": 42,
+ "dataset": "CubiCasa5K ROTATED plans (skv4 types/windows + phungpx COCO room polygons)",
+ "n_test": 15,
+ "models": {
+  "carbon": "gemini-4-carbon"
+ },
+ "iou_headline": "raw (GT = COCO inner-edge room polygons)",
+ "systems": {
+  "B1": {
+   "name": "Baseline B1",
+   "desc": "Single Carbon call -> room polygons"
+  },
+  "v1": {
+   "name": "Footprint v1",
+   "desc": "Carbon + OpenCV + Decisions verify + Neon repair"
+  }
+ },
+ "headline": {
+  "verified_precision": {
+   "B1": 0.8046875,
+   "v1": 0.6666666666666666
+  }
+ },
+ "metrics": [
+  {
+   "key": "room_iou",
+   "label": "Room shape IoU",
+   "fmt": "ratio",
+   "higher_is_better": true,
+   "B1": 0.8673939841435135,
+   "v1": 0.788124408200938
+  },
+  {
+   "key": "count_acc",
+   "label": "Room count exact",
+   "fmt": "pct",
+   "higher_is_better": true,
+   "B1": 0.26666666666666666,
+   "v1": 0.26666666666666666
+  },
+  {
+   "key": "count_mae",
+   "label": "Room count error",
+   "fmt": "num",
+   "higher_is_better": false,
+   "B1": 1.0666666666666667,
+   "v1": 1
+  },
+  {
+   "key": "type_acc",
+   "label": "Room type accuracy",
+   "fmt": "pct",
+   "higher_is_better": true,
+   "B1": 0.9777777777777777,
+   "v1": 1.0
+  },
+  {
+   "key": "window_acc",
+   "label": "Bedroom window check (when answered)",
+   "fmt": "pct",
+   "higher_is_better": true,
+   "B1": 0.5714285714285714,
+   "v1": null
+  },
+  {
+   "key": "window_coverage",
+   "label": "Bedroom window answered",
+   "fmt": "pct",
+   "higher_is_better": true,
+   "B1": 1.0,
+   "v1": 0.0
+  },
+  {
+   "key": "verified_precision",
+   "label": "Right when VERIFIED",
+   "fmt": "pct",
+   "higher_is_better": true,
+   "B1": 0.8046875,
+   "v1": 0.6666666666666666
+  },
+  {
+   "key": "room_precision_all",
+   "label": "Right, all rooms",
+   "fmt": "pct",
+   "higher_is_better": true,
+   "B1": 0.7984496124031008,
+   "v1": 0.7301587301587301
+  },
+  {
+   "key": "latency_p50_s",
+   "label": "Latency p50",
+   "fmt": "sec",
+   "higher_is_better": false,
+   "B1": 10.975965291960165,
+   "v1": 35.433
+  },
+  {
+   "key": "cost_usd",
+   "label": "Cost per plan",
+   "fmt": "usd",
+   "higher_is_better": false,
+   "B1": 0.0111116,
+   "v1": 0.12384266666666667
+  }
+ ],
+ "by_variant": [
+  {
+   "variant": "clean",
+   "n": 15,
+   "B1": {
+    "room_iou": 0.8673939841435135,
+    "verified_precision": 0.8046875
+   },
+   "v1": {
+    "room_iou": 0.788124408200938,
+    "verified_precision": 0.6666666666666666
+   }
+  }
+ ],
+ "coverage_curve": {
+  "B1": [
+   [
+    0.2,
+    0.885
+   ],
+   [
+    0.4,
+    0.846
+   ],
+   [
+    0.6,
+    0.883
+   ],
+   [
+    0.8,
+    0.864
+   ],
+   [
+    1.0,
+    0.798
+   ]
+  ],
+  "v1": [
+   [
+    0.2,
+    0.72
+   ],
+   [
+    0.4,
+    0.78
+   ],
+   [
+    0.6,
+    0.776
+   ],
+   [
+    0.8,
+    0.782
+   ],
+   [
+    1.0,
+    0.73
+   ]
+  ]
+ },
+ "failures": [
+  {
+   "category": "extra_room",
+   "count": 20,
+   "example": "13281: 'PARVEKE' matches no GT room"
+  },
+  {
+   "category": "open_plan_merge",
+   "count": 13,
+   "example": "13281: 'OH + KT' spans 3 GT rooms"
+  },
+  {
+   "category": "missed_room",
+   "count": 9,
+   "example": "13281: GT room not traced"
+  },
+  {
+   "category": "leak_oversize",
+   "count": 3,
+   "example": "3024: room: IoU 0.43, area x2.35"
+  },
+  {
+   "category": "undersize",
+   "count": 2,
+   "example": "7780: room: IoU 0.28, area x0.28"
+  },
+  {
+   "category": "misplaced",
+   "count": 1,
+   "example": "7780: room: IoU 0.50, area x1.20"
+  }
+ ],
+ "failures_baseline": [
+  {
+   "category": "extra_room",
+   "count": 19,
+   "example": "13281: 'PARVEKE' matches no GT room"
+  },
+  {
+   "category": "open_plan_merge",
+   "count": 7,
+   "example": "13281: 'KT' spans 2 GT rooms"
+  },
+  {
+   "category": "missed_room",
+   "count": 5,
+   "example": "13281: GT room not traced"
+  },
+  {
+   "category": "undersize",
+   "count": 2,
+   "example": "7780: room: IoU 0.31, area x0.32"
+  },
+  {
+   "category": "wrong_type",
+   "count": 1,
+   "example": "6716: GT Bath labelled 'khh 7,7' (Storage)"
+  }
+ ],
+ "detail": {
+  "B1": {
+   "n_plans": 15,
+   "n_errors": 0,
+   "room_iou": 0.8673939841435135,
+   "count_acc": 0.26666666666666666,
+   "count_mae": 1.0666666666666667,
+   "type_acc": 0.9777777777777777,
+   "window_acc": 0.5714285714285714,
+   "window_coverage": 1.0,
+   "verified_precision": 0.8046875,
+   "verified_share": 0.9922480620155039,
+   "room_precision_all": 0.7984496124031008,
+   "latency_p50_s": 10.975965291960165,
+   "latency_p95_s": 13.301484641828575,
+   "cost_usd": 0.0111116,
+   "coverage_curve": [
+    [
+     0.2,
+     0.885
+    ],
+    [
+     0.4,
+     0.846
+    ],
+    [
+     0.6,
+     0.883
+    ],
+    [
+     0.8,
+     0.864
+    ],
+    [
+     1.0,
+     0.798
+    ]
+   ]
+  },
+  "v1": {
+   "n_plans": 15,
+   "n_errors": 0,
+   "room_iou": 0.788124408200938,
+   "count_acc": 0.26666666666666666,
+   "count_mae": 1,
+   "type_acc": 1.0,
+   "window_acc": null,
+   "window_coverage": 0.0,
+   "verified_precision": 0.6666666666666666,
+   "verified_share": 0.16666666666666666,
+   "room_precision_all": 0.7301587301587301,
+   "latency_p50_s": 35.433,
+   "latency_p95_s": 43.42469999999998,
+   "cost_usd": 0.12384266666666667,
+   "coverage_curve": [
+    [
+     0.2,
+     0.72
+    ],
+    [
+     0.4,
+     0.78
+    ],
+    [
+     0.6,
+     0.776
+    ],
+    [
+     0.8,
+     0.782
+    ],
+    [
+     1.0,
+     0.73
+    ]
+   ]
+  }
+ },
+ "generated_at": "2026-11-21 15:14"
+}

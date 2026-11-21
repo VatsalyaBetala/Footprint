@@ -1,0 +1,26 @@
+{"plan_id": "7821", "category": "undersize", "detail": "room: IoU 0.14, area x0.14"}
+{"plan_id": "7821", "category": "leak_oversize", "detail": "room: IoU 0.41, area x2.45"}
+{"plan_id": "7821", "category": "extra_room", "detail": "'Patio/Terrace' matches no GT room"}
+{"plan_id": "7821", "category": "open_plan_merge", "detail": "'RUOK / Hall' spans 2 GT rooms"}
+{"plan_id": "7821", "category": "extra_room", "detail": "'Closet' matches no GT room"}
+{"plan_id": "7821", "category": "extra_room", "detail": "'TK' matches no GT room"}
+{"plan_id": "6523", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "6523", "category": "open_plan_merge", "detail": "'ET.' spans 2 GT rooms"}
+{"plan_id": "3", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "7554", "category": "wrong_type", "detail": "GT Storage labelled 'AT 19.5' (None)"}
+{"plan_id": "7554", "category": "wrong_type", "detail": "GT Bath labelled 'Closet' (Storage)"}
+{"plan_id": "7554", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "7554", "category": "extra_room", "detail": "'Porch' matches no GT room"}
+{"plan_id": "9132", "category": "extra_room", "detail": "'PARVEKE' matches no GT room"}
+{"plan_id": "9132", "category": "extra_room", "detail": "'Closet' matches no GT room"}
+{"plan_id": "13067", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "11810", "category": "extra_room", "detail": "'Closet' matches no GT room"}
+{"plan_id": "11810", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "10218", "category": "extra_room", "detail": "'S3' matches no GT room"}
+{"plan_id": "14581", "category": "extra_room", "detail": "'TER' matches no GT room"}
+{"plan_id": "14581", "category": "extra_room", "detail": "'KU' matches no GT room"}
+{"plan_id": "14581", "category": "extra_room", "detail": "'VAR' matches no GT room"}
+{"plan_id": "7857", "category": "extra_room", "detail": "'Balcony' matches no GT room"}
+{"plan_id": "7857", "category": "extra_room", "detail": "'SK' matches no GT room"}
+{"plan_id": "7857", "category": "extra_room", "detail": "'SAUNA' matches no GT room"}
+{"plan_id": "7857", "category": "extra_room", "detail": "'SH.' matches no GT room"}

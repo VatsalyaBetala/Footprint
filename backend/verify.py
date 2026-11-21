@@ -1,9 +1,12 @@
-"""verify.py — Decisions API checks every room outline against the plan; Neon picks repairs from a fixed menu.
+"""verify.py — Decisions API checks every room outline against the plan; Neon ranks repairs from a fixed menu.
 
 verify_and_repair(img, parsed, geo) -> {"rooms", "alignment_score_history", "decision_checks", "windows",
-                                       "repairs", "usage", "cost_usd", "timing_ms"}
-Models never output coordinates: Decisions returns probabilities, Neon returns one menu item, and every
-repair is applied deterministically here (or by re-running geometry.py).
+                                       "repairs", "neon", "usage", "cost_usd", "timing_ms"}
+Loop: check all rooms (iteration 0) -> Neon ranks the repair menu once per failing room -> each round applies
+every failing room's next-ranked repair, re-checks only the changed rooms, and KEEPS a repair only if the
+area-weighted alignment score rises (or ties with higher confidence); otherwise it is rolled back. So the
+score history never goes down. Models never output coordinates: Decisions returns probabilities, Neon returns
+option names, every repair is applied deterministically here (or by re-running geometry.py).
 "usage" is keyed by model name ({"input_tokens", "output_tokens", "thought_tokens", "calls"}) for server
 pricing; cost_usd is None here because prices live in server.py.
 CLI: python backend/verify.py <plan> [...]   (reuses scratch/parse_<name>.json if present)
@@ -48,9 +51,11 @@ NEON_PROMPT = """You repair one room outline in a floor-plan digitizer. The imag
 with the current outline for the room "{label}" drawn in red{partner_note}.
 Verification failed on: {failed}.
 How the outline was made: {method}. Flags: {flags}.
-Choose exactly ONE repair:
+Repairs available:
 {options}
-Return ONLY JSON: {{"repair": "<option name>"}}"""
+Rank ALL of these repairs from best to worst for this outline. Repairs are tried in your order and each one is
+kept only if verification improves; anything ranked below "keep" is never tried.
+Return ONLY JSON: {{"ranking": ["<option name>", ...]}}"""
 
 REPAIR_HELP = {
     "use_box": "replace the outline with the room's detected bounding box (when the trace leaked or was cut short)",
@@ -62,10 +67,11 @@ REPAIR_HELP = {
 
 DECISIONS = "models/gemini-decision-1"
 NEON = "gemini-4-neon"
-NEON_THINKING = "LOW"     # auto-dropped if the API rejects it
+NEON_THINKING = "LOW"     # lowest level Neon accepts (MINIMAL -> 400); auto-dropped if the API rejects it
 TIMEOUT_S = 15
 MAX_WORKERS = 8
-MAX_ITERS = 3
+MAX_ITERS = 3             # repair rounds after iteration 0 (Neon is asked once; rounds walk its ranking)
+BUDGET_S = 20             # no new repair round starts after this much verify time
 PASS_NOUL, PASS_SCORE = 0.7, 1.5
 PAD_FT, WINDOW_PAD_FT = 1.5, 5.0
 EXTERIOR_YES, EXTERIOR_NO = 0.7, 0.3
@@ -166,16 +172,21 @@ def _check_window(img, w, pad, radius, thick):
         return {"p": None, "latency_ms": None, "tokens": 0, "error": f"{type(e).__name__}: {str(e)[:200]}"}
 
 
+def _rule_ranking(options):
+    return [o for o in ("use_box", "split", "reseed") if o in options] + ["keep"]
+
+
 def _ask_neon(room, res, options, partners, crop):
-    """Neon picks ONE option name. Returns (choice, source, ms, usage). Falls back to a fixed rule on failure."""
-    failed =[f"{k} (p={v:.2f})" for k, v in res["checks"].items() if v < PASS_NOUL]
+    """Neon ranks the option names. Returns (ranking, source, ms, usage). Falls back to a fixed rule on failure."""
+    failed = [f"{k} (p={v:.2f})" for k, v in res["checks"].items() if v < PASS_NOUL]
     if res["score"] is not None and res["score"] < PASS_SCORE:
         failed.append(f"alignment (score {res['score']:.1f} of 3)")
     prompt = NEON_PROMPT.format(
         label=room["label"], partner_note=f", and room {partners['split']} in blue" if "split" in partners else "",
         failed=", ".join(failed) or "unknown", method=room["method"], flags=", ".join(room["flags"]) or "none",
         options="\n".join(f"- {o}: {REPAIR_HELP[o].format(other=partners.get(o, ''))}" for o in options))
-    schema = {"type": "OBJECT", "properties": {"repair": {"type": "STRING", "enum": options}}, "required": ["repair"]}
+    schema = {"type": "OBJECT", "required": ["ranking"],
+              "properties": {"ranking": {"type": "ARRAY", "items": {"type": "STRING", "enum": options}}}}
 
     def call():
         global _neon_thinking
@@ -191,18 +202,18 @@ def _ask_neon(room, res, options, partners, crop):
             if _neon_thinking and "thinking" in str(e).lower():
                 _neon_thinking = False  # parameter rejected -> drop it
             raise
-        choice = json.loads(resp.text).get("repair")
-        if choice not in options:
-            raise ValueError(f"neon returned {choice!r}, not in {options}")
-        return choice, resp.usage_metadata
+        ranking = list(dict.fromkeys(o for o in json.loads(resp.text).get("ranking", []) if o in options))
+        if not ranking:
+            raise ValueError(f"neon returned no valid option: {resp.text[:120]!r}")
+        return ranking + ([] if "keep" in ranking else ["keep"]), resp.usage_metadata
 
     try:
-        (choice, u), ms = _with_retry(f"neon {room['id']}", call)
+        (ranking, u), ms = _with_retry(f"neon {room['id']}", call)
         usage = {"input_tokens": u.prompt_token_count or 0, "output_tokens": u.candidates_token_count or 0,
                  "thought_tokens": u.thoughts_token_count or 0} if u else None
-        return choice, "neon", round(ms), usage
+        return ranking, "neon", round(ms), usage
     except Exception:
-        return ("use_box" if "use_box" in options else "keep"), "rule_fallback", None, None
+        return _rule_ranking(options), "rule_fallback", None, None
 
 
 def _set_geom(room, geom):
@@ -289,10 +300,23 @@ def _open_point(room, geo):
     return [int(x1 + xx), int(y1 + yy)]
 
 
+def _no_new_overlap(room, geom, rooms):
+    """Trim floor that this repair would newly take from other rooms (overlap that already existed is left)."""
+    for o in rooms:
+        if o is room or o["geom"] is None:
+            continue
+        taken = geom.intersection(o["geom"]).difference(room["geom"])
+        if taken.area > 0:
+            geom = geom.difference(taken)
+    return geom
+
+
 def _apply(choice, room, partner, rooms, img, parsed, geo, gap):
-    """Apply one repair deterministically. Returns the set of room ids whose outline changed."""
+    """Apply one repair deterministically (mutates room/partner/rooms). Returns ids whose outline changed.
+    use_box / reseed never create new double-counted floor with another room (e.g. never undo a split)."""
     if choice == "use_box":
-        _set_geom(room, shapely_box(*room["box"]))
+        if not _set_geom(room, _no_new_overlap(room, shapely_box(*room["box"]), rooms)):
+            return set()
         room["method"] = "box_fallback"
     elif choice == "reseed":
         seed = _open_point(room, geo)
@@ -301,9 +325,11 @@ def _apply(choice, room, partner, rooms, img, parsed, geo, gap):
                   if r["id"] == room["id"])
         if nr["geom"] is None:
             return set()
+        new_geom = _no_new_overlap(room, nr["geom"], rooms)
         room["seed"], room["method"] = seed, nr["method"]
         room["flags"] = list(dict.fromkeys(room["flags"] + nr["flags"]))
-        _set_geom(room, nr["geom"])
+        if not _set_geom(room, new_geom):
+            return set()
     elif choice == "split" and partner is not None:
         if not _split(room, partner):
             return set()
@@ -323,10 +349,21 @@ def _apply(choice, room, partner, rooms, img, parsed, geo, gap):
     return {room["id"]}
 
 
-def _alignment_score(rooms, results):
-    tot = sum(r["geom"].area for r in rooms if r["geom"] is not None)
-    ok = sum(r["geom"].area for r in rooms if r["geom"] is not None and results.get(r["id"], {}).get("verified"))
-    return round(ok / tot, 3) if tot else 0.0
+def _alignment_score(rooms, results, weights):
+    """Share of room area verified. Weights = each room's iteration-0 area, fixed for the whole run, so a repair
+    moves the score only by flipping verification, never by growing/shrinking a still-failing outline."""
+    tot = sum(weights.get(r["id"], 0.0) for r in rooms)
+    ok = sum(weights.get(r["id"], 0.0) for r in rooms if results.get(r["id"], {}).get("verified"))
+    return round(ok / tot, 4) if tot else 0.0
+
+
+def _mean_conf(res_list):
+    v = [(r["confidence"] or 0.0) for r in res_list if r]
+    return sum(v) / len(v) if v else 0.0
+
+
+def _copy(r):
+    return {**r, "flags": list(r["flags"]), "verify_log": list(r["verify_log"])}
 
 
 def verify_and_repair(img, parsed, geo):
@@ -336,73 +373,125 @@ def verify_and_repair(img, parsed, geo):
     px_ft = scale or 0.025 * max(W, H)  # only for crop padding / drawing when scale is undetermined
     pad, thick = max(8, round(PAD_FT * px_ft)), max(2, round(min(H, W) / 250))
     gap = max(3, round(0.75 * px_ft))  # wall thickness tolerance for merge adjacency
-    rooms = [{**r, "flags": list(r.get("flags") or [])} for r in geo["rooms"]]
+    rooms = [{**r, "flags": list(r.get("flags") or []), "verify_log": []} for r in geo["rooms"]]
     for r in rooms:
         if r.get("geom") is None and r.get("polygon"):
             r["geom"] = Polygon(r["polygon"])
-    for r in rooms:
-        r["verify_log"] = []  # per-iteration {iteration, verified, confidence, alignment, method} for the UI
-    results, repairs, history = {}, [], []
-    _get_client()  # create the shared client before worker threads start
+    results, repairs, history, neon_log = {}, [], [], []
     dec_usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "thought_tokens": 0}
     neon_usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "thought_tokens": 0}
+    _get_client()  # create the shared client before worker threads start
 
     with ThreadPoolExecutor(MAX_WORKERS) as ex:
-        def verify_ids(ids, iteration):
-            todo = [r for r in rooms if r["id"] in ids and r["geom"] is not None]
+        def run_checks(room_list, iteration):
+            """One Decisions call per room, in parallel. Returns {id: result}; logs usage and verify_log."""
+            todo = [r for r in room_list if r["geom"] is not None]
+            out = {}
             for r, res in zip(todo, ex.map(lambda r: _check_room(img, r, pad, thick), todo)):
-                results[r["id"]] = res
+                out[r["id"]] = res
                 dec_usage["calls"] += 1
                 dec_usage["input_tokens"] += res["tokens"]
                 r["verify_log"].append({"iteration": iteration, "verified": res["verified"],
                                         "confidence": res["confidence"], "method": r["method"],
                                         "alignment": round(res["score"], 2) if res["score"] is not None else None})
+            return out
 
         # iteration 0: all rooms + all windows in one parallel batch
         wins = [w for w in parsed.get("windows") or [] if w.get("center")]
         f_wins = [ex.submit(_check_window, img, w, max(10, round(WINDOW_PAD_FT * px_ft)),
-                            max(8, round(1.5 * px_ft)), max(1, thick - 1)) for w in wins]  # wide thin ring: don't hide the window
-        verify_ids({r["id"] for r in rooms}, 0)
-        history.append(_alignment_score(rooms, results))
-        settled = set()  # failing rooms where Neon chose keep (or nothing applicable changed them)
+                            max(8, round(1.5 * px_ft)), max(1, thick - 1)) for w in wins]  # wide thin ring
+        results.update(run_checks(rooms, 0))
+        weights = {r["id"]: r["geom"].area for r in rooms if r["geom"] is not None}
+        history.append(_alignment_score(rooms, results, weights))
+        ranking, tried, settled = {}, {}, set()
 
         for it in range(1, MAX_ITERS + 1):
+            if time.perf_counter() - t0 > BUDGET_S:
+                log.warning("verify budget %ss reached; no further repair rounds", BUDGET_S)
+                break
             failing = [r for r in rooms if r["id"] in results and not results[r["id"]]["verified"]
                        and results[r["id"]]["error"] is None and r["id"] not in settled]
             if not failing:
                 break
-            plans = []
+
+            # Neon ranks the menu once per failing room (in parallel)
+            need = [r for r in failing if r["id"] not in ranking]
+            if need:
+                plans = []
+                for r in need:
+                    opts, partners = _options(r, rooms, gap)
+                    blue = next((o for o in rooms if o["id"] == partners.get("split")), None)
+                    plans.append((r, opts, partners, _room_crop(img, r, pad, thick, blue)))
+                answers = ex.map(lambda p: _ask_neon(p[0], results[p[0]["id"]], p[1], p[2], p[3]), plans)
+                for (r, *_), (rank, source, ms, usage) in zip(plans, answers):
+                    ranking[r["id"]] = rank
+                    neon_log.append({"room": r["id"], "ranking": rank, "source": source, "latency_ms": ms})
+                    if usage:
+                        neon_usage["calls"] += 1
+                        for k in ("input_tokens", "output_tokens", "thought_tokens"):
+                            neon_usage[k] += usage[k]
+
+            # apply each failing room's next untried repair on copies
+            work_list = [_copy(r) for r in rooms]
+            work = {r["id"]: r for r in work_list}
+            attempts, busy = [], set()
             for r in failing:
-                opts, partners = _options(r, rooms, gap)
-                blue = next((o for o in rooms if o["id"] == partners.get("split")), None)
-                plans.append((r, opts, partners, _room_crop(img, r, pad, thick, blue)))
-            choices = list(ex.map(lambda p: _ask_neon(p[0], results[p[0]["id"]], p[1], p[2], p[3]), plans))
-            changed = set()
-            for (r, opts, partners, _), (choice, source, ms, usage) in zip(plans, choices):
-                if usage:
-                    neon_usage["calls"] += 1
-                    for k in ("input_tokens", "output_tokens", "thought_tokens"):
-                        neon_usage[k] += usage[k]
+                rid = r["id"]
+                opts, partners = _options(work[rid], work_list, gap)
+                tried.setdefault(rid, set())
+                choice = next((c for c in ranking[rid] if c in opts and c not in tried[rid]), "keep")
+                if choice == "keep":
+                    settled.add(rid)
+                    continue
                 pid = partners.get(choice)
-                partner = next((o for o in rooms if o["id"] == pid), None)
-                applied = set()
-                alive = any(o is r for o in rooms)
-                if alive and r["id"] not in changed and (partner is None or partner["id"] not in changed):
-                    applied = _apply(choice, r, partner, rooms, img, parsed, geo, gap)
-                repairs.append({"iteration": it, "room": r["id"], "choice": choice, "partner": pid,
-                                "source": source, "latency_ms": ms, "applied": bool(applied)})
-                if not applied:
-                    settled.add(r["id"])
-                changed |= applied
-            settled -= changed
-            for rid in list(results):
-                if rid not in {r["id"] for r in rooms}:
-                    results.pop(rid)  # merged away
-            if not changed:
-                history.append(history[-1])
-                break
-            verify_ids(changed, it)
-            history.append(_alignment_score(rooms, results))
+                if rid in busy or (pid is not None and pid in busy):
+                    continue  # touches a room already being repaired this round; try next round
+                tried[rid].add(choice)
+                before = {o["id"] for o in work_list}
+                changed = _apply(choice, work[rid], work.get(pid), work_list, img, parsed, geo, gap)
+                removed = before - {o["id"] for o in work_list}
+                busy |= changed | removed | {rid}
+                if changed:
+                    attempts.append({"room": rid, "choice": choice, "partner": pid, "changed": changed,
+                                     "removed": removed})
+                else:
+                    repairs.append({"iteration": it, "room": rid, "choice": choice, "partner": pid,
+                                    "accepted": False, "reason": "not applicable"})
+            if not attempts:
+                continue
+
+            # re-check only changed rooms; keep a repair only if the score rises (or ties with higher confidence)
+            alive = {o["id"]: o for o in work_list}
+            new_res = run_checks([alive[i] for a in attempts for i in a["changed"] if i in alive], it)
+            pre, pre_weights = _alignment_score(rooms, results, weights), weights
+            keep_changed, keep_removed = set(), set()
+            for a in attempts:
+                ids, gone = a["changed"], a["removed"]
+                cand = [alive[o["id"]] if o["id"] in ids else o for o in rooms if o["id"] not in gone]
+                cres = {k: v for k, v in results.items() if k not in gone}
+                cres.update({i: new_res[i] for i in ids if i in new_res})
+                cw = dict(weights)
+                for g in gone:  # a merged-away room's weight moves to the surviving room
+                    cw[next(iter(ids))] = cw.get(next(iter(ids)), 0.0) + cw.pop(g, 0.0)
+                s_new = _alignment_score(cand, cres, cw)
+                c_pre, c_new = _mean_conf([results.get(i) for i in ids | gone]), _mean_conf([new_res.get(i) for i in ids])
+                # split removes double-counted floor (a geometric fix in itself): keep it unless it costs verification
+                ok = s_new > pre + 1e-6 or (abs(s_new - pre) <= 1e-6 and (c_new > c_pre + 1e-6 or a["choice"] == "split"))
+                if ok:
+                    keep_changed |= ids
+                    keep_removed |= gone
+                    weights = cw if gone else weights
+                repairs.append({"iteration": it, "room": a["room"], "choice": a["choice"], "partner": a["partner"],
+                                "accepted": ok, "score_before": round(pre, 3), "score_after": round(s_new, 3),
+                                "confidence_before": round(c_pre, 3), "confidence_after": round(c_new, 3)})
+            new_rooms = [alive[o["id"]] if o["id"] in keep_changed else o for o in rooms if o["id"] not in keep_removed]
+            new_results = {k: v for k, v in results.items() if k not in keep_removed}
+            new_results.update({i: new_res[i] for i in keep_changed if i in new_res})
+            if _alignment_score(new_rooms, new_results, weights) + 1e-6 >= pre:  # guard: combined repairs never lower it
+                rooms, results = new_rooms, new_results
+            else:
+                weights = pre_weights
+            history.append(_alignment_score(rooms, results, weights))
 
         win_res = [f.result() for f in f_wins]
 
@@ -450,10 +539,12 @@ def verify_and_repair(img, parsed, geo):
                                "p_yes": round(p, 3), "latency_ms": wr["latency_ms"]})
     windows += [w for w in parsed.get("windows") or [] if not w.get("center")]
 
+    history = [round(h, 3) for h in history]
     ms = (time.perf_counter() - t0) * 1000
-    log.info("verify %.0f ms history=%s repairs=%s", ms, history, [(x["room"], x["choice"]) for x in repairs])
+    log.info("verify %.0f ms history=%s repairs=%s", ms, history,
+             [(x["room"], x["choice"], x["accepted"]) for x in repairs])
     return {"rooms": rooms, "alignment_score_history": history, "decision_checks": checks_out, "windows": windows,
-            "repairs": repairs, "cost_usd": None, "timing_ms": round(ms),
+            "repairs": repairs, "neon": neon_log, "cost_usd": None, "timing_ms": round(ms),
             "usage": {"gemini-decision-1": dec_usage, NEON: neon_usage},
             "_crops": {rid: res["crop"] for rid, res in results.items()}}
 
@@ -486,29 +577,30 @@ if __name__ == "__main__":
 
     scratch = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scratch"))
     os.makedirs(os.path.join(scratch, "verify_crops"), exist_ok=True)
-    for path in sys.argv[1:]:
+    fresh = "--fresh" in sys.argv  # --fresh: new Carbon call instead of scratch/parse_<name>.json
+    for path in [a for a in sys.argv[1:] if not a.startswith("--")]:
         name = os.path.splitext(os.path.basename(path))[0]
         cache = os.path.join(scratch, f"parse_{name}.json")
         img = cv2.imread(path)
-        parsed = json.load(open(cache)) if os.path.exists(cache) else parse_plan(path)
+        parsed = json.load(open(cache)) if (os.path.exists(cache) and not fresh) else parse_plan(path)
         geo = geometry.build_rooms(img, parsed)
         ver = verify_and_repair(img, parsed, geo)
         draw_debug(img, ver, os.path.join(scratch, f"verify_{name}.png"))
         for rid, crop in ver.pop("_crops").items():
             cv2.imwrite(os.path.join(scratch, "verify_crops", f"{name}_{rid}.png"), crop)
         print(f"\n== {path}  verify {ver['timing_ms']} ms  alignment history {ver['alignment_score_history']}")
+        for n in ver["neon"]:
+            print(f"  neon ranking {n['room']}: {n['ranking']} ({n['source']}, {n['latency_ms']} ms)")
         for x in ver["repairs"]:
-            print(f"  repair it{x['iteration']}: {x['room']} -> {x['choice']}"
-                  f"{' with ' + x['partner'] if x['partner'] and x['choice'] in ('split', 'merge') else ''}"
-                  f" ({x['source']}, {x['latency_ms']} ms, applied={x['applied']})")
+            extra = (f" score {x['score_before']}->{x['score_after']} conf {x['confidence_before']}->{x['confidence_after']}"
+                     if "score_before" in x else f" ({x.get('reason')})")
+            print(f"  it{x['iteration']}: {x['room']} {x['choice']}{' with ' + x['partner'] if x['partner'] and x['choice'] in ('split', 'merge') else ''}"
+                  f" -> {'KEPT' if x['accepted'] else 'rolled back'}{extra}")
         for r in ver["rooms"]:
             trail = " -> ".join(f"it{v['iteration']}:{v['method']}:{'OK' if v['verified'] else 'x'}({v['confidence']})"
                                 for v in r["verify_log"])
             print(f"  {r['id']:3s} {r['label'][:24]:24s} {'VERIFIED' if r['verified'] else 'failed  '} "
-                  f"conf={r['confidence']} align={r['alignment']} area={r['area_sqft']} checks={r['checks']}")
-            print(f"        trail: {trail}  flags={r['flags']}")
+                  f"conf={r['confidence']} align={r['alignment']} area={r['area_sqft']}  trail: {trail}")
         for w in ver["windows"]:
-            print(f"  window {w['id']} p_exterior={w['p_exterior']} -> on_exterior_wall={w['on_exterior_wall']} "
-                  f"(carbon said {w['on_exterior_wall_carbon']})")
+            print(f"  window {w['id']} p_exterior={w['p_exterior']} -> on_exterior_wall={w['on_exterior_wall']}")
         print(f"  usage: {ver['usage']}")
-        print(f"  debug: scratch/verify_{name}.png  crops: scratch/verify_crops/{name}_*.png")

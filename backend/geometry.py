@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
-from shapely.geometry import Polygon, box as shapely_box
+from shapely.geometry import MultiPolygon, Polygon, box as shapely_box
 
 DOOR_FT_DEFAULT = 2.67
 CLOSE_MARGIN = 1.25        # close kernel = door width px * this (entrances run ~3 ft)
@@ -32,6 +32,8 @@ SMALL_BLOB = 0.6           # mask blobs shorter than this x door width (text, ch
 THICK_FT = 1.2             # color_strong: blobs thicker than this are furniture, never walls
 CONFINE_FT = 0.5           # tracing is confined to the union of Carbon boxes grown by this margin
 MIN_INSIDE_BOX = 0.75      # at least this share of a traced region must lie inside its own (grown) box
+SEAL_MIN_FT = 0.2          # only structures thicker than this (walls, not door leaves/text) are bridged when sealing doors
+SMOOTH_FT = 0.1            # morphological close on traced polygons: removes slits around door leaves
 SCALE_OUTLIER = 0.10
 COLOR_TOL = 14.0           # Lab distance (OpenCV 8-bit Lab units) to the sampled wall color
 FLOOR_EXCLUDE = 10.0       # ring pixels this close to a room's floor color are not wall samples
@@ -120,17 +122,21 @@ def _rough_scale(rooms):
     return statistics.median(s) if s else None
 
 
-def _region_polygon(region):
+def _region_polygon(region, smooth_px):
     cnts, _ = cv2.findContours(region, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     c = max(cnts, key=cv2.contourArea)
     c = cv2.approxPolyDP(c, max(1.5, 0.004 * cv2.arcLength(c, True)), True).reshape(-1, 2)
     if len(c) < 3:
         return None
     p = Polygon(c)
-    return p if p.is_valid else p.buffer(0)
+    p = p if p.is_valid else p.buffer(0)
+    p = p.buffer(smooth_px, join_style="mitre").buffer(-smooth_px, join_style="mitre")  # close thin slits
+    if isinstance(p, MultiPolygon):
+        p = max(p.geoms, key=lambda g: g.area)
+    return p.simplify(1.0) if isinstance(p, Polygon) and not p.is_empty else None
 
 
-def _trace(labels, room, others, W, H, grow):
+def _trace(labels, room, others, W, H, grow, smooth_px):
     """Region containing the room's seed in a labeled free-space map. Returns (polygon|None, status, flags)."""
     x, y = room["seed"]
     lab = labels[y, x]
@@ -161,7 +167,7 @@ def _trace(labels, room, others, W, H, grow):
         inside = ((xs >= x1 - grow) & (xs <= x2 + grow) & (ys >= y1 - grow) & (ys <= y2 + grow)).mean()
         if inside < MIN_INSIDE_BOX:
             return None, "spilled", flags  # ran into an unlabeled/open area outside its own box
-    poly = _region_polygon(region)
+    poly = _region_polygon(region, smooth_px)
     return (poly, "ok", flags) if poly is not None and poly.area > 0 else (None, "no_polygon", flags)
 
 
@@ -211,8 +217,12 @@ def build_rooms(img, parsed, walls=None):
             if m is None:
                 label_maps[method] = None
             else:
-                m = _drop_small(m, SMALL_BLOB * door_px)
-                free = cv2.bitwise_not(_close_doors(m, close_len) | obstacles)
+                base = _drop_small(m, SMALL_BLOB * door_px)
+                # seal doors by bridging thick structures only, so thin door leaves / text never get bridged to walls
+                s = int(SEAL_MIN_FT * px_per_ft)
+                k = max(3, s if s % 2 else s - 1)  # largest odd kernel <= SEAL_MIN_FT
+                thick =_drop_small(cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((k, k), np.uint8)), SMALL_BLOB * door_px)
+                free = cv2.bitwise_not(base | _close_doors(thick, close_len) | obstacles)
                 label_maps[method] = cv2.connectedComponents(free, connectivity=4)[1]
         return label_maps[method]
 
@@ -229,7 +239,7 @@ def build_rooms(img, parsed, walls=None):
                 if labels is None:
                     room["attempts"][method] = "no_mask"
                     continue
-                poly, status, f = _trace(labels, r, others, W, H, grow)
+                poly, status, f = _trace(labels, r, others, W, H, grow, max(2.0, SMOOTH_FT * px_per_ft))
                 room["attempts"][method] = status
                 if poly is not None:
                     room["geom"], room["method"] = poly, method

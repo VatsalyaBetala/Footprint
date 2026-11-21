@@ -63,7 +63,8 @@ single-Carbon-call baseline.
   ],
   "doors": [{"id": "d1", "center": [0,0], "width_ft": 2.67, "hinge": "left"}],
   "entrance": [0, 0],
-  "area": {"from_printed": 712, "from_geometry": 698, "listing_claim": 850},
+  "area": {"from_printed": 712, "from_geometry": 698, "listing_claim": 850,
+           "claim_scope": "same_floor | ambiguous | null"},
   "alignment_score_history": [0.61, 0.88, 0.94],
   "answers": {
     "king_bed_fits": {"room": "r1", "fits": false, "reason": "..."},
@@ -80,6 +81,9 @@ single-Carbon-call baseline.
 }
 ```
 Person B builds against `samples/mock_model.json` until /analyze works.
+`claim_scope`: "same_floor" only when the claim clearly covers the floor shown; "ambiguous"
+(e.g. one floor of a multi-floor listing) → show both numbers, no overstated/understated verdict;
+null when there is no claim. Never call area overstated unless claim_scope = "same_floor".
 
 ## Eval (eval/)
 - 50 random CubiCasa5K plans (fixed seed, recorded in results).

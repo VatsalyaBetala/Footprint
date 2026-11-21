@@ -6,150 +6,200 @@
 <title>Footprint</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+/* Footprint: architectural / editorial. Warm paper, ink, hairlines; serif display, grotesk UI, mono figures.
+   Selectors used by the page JS, three3d.js and cad3d.js are unchanged; only their look is. */
 :root {
-  --bg: #f5f6f8; --panel: #ffffff; --ink: #0f172a; --muted: #5b6577; --line: #e3e7ee; --line-strong: #cbd3df;
-  --accent: #2563eb; --accent-tint: #eaf0ff; --accent-ink: #1d4ed8;
-  --ok: #10b981; --ok-ink: #047857; --ok-tint: #e7f8f1; --warn: #f59e0b; --warn-ink: #b45309; --warn-tint: #fff5e1;
-  --bad: #ef4444; --bad-ink: #b91c1c; --bad-tint: #fdecec;
-  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; --sans: "Inter", -apple-system, system-ui, sans-serif;
-  --float: 0 4px 18px rgba(15, 23, 42, .07);
+  --bg: #f4f1ea; --panel: #fbf9f4; --paper: #fffdf8; --ink: #1a1915; --muted: #6e695e; --line: #e3ded2; --line-strong: #cbc3b2;
+  --accent: #27466b; --accent-tint: #e7ebf0; --accent-ink: #1e3858;
+  --ok: #3f7355; --ok-ink: #2c5a40; --ok-tint: #e8eee6; --warn: #b07d2a; --warn-ink: #85591a; --warn-tint: #f5ecd9;
+  --bad: #a8432f; --bad-ink: #8a3322; --bad-tint: #f4e3dd;
+  --serif: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+  --sans: "Geist", "Inter", -apple-system, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  --float: none;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); }
-.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px 48px; }
-header { display: flex; align-items: center; gap: 12px; padding: 16px 0 12px; }
-header .brand { font-weight: 700; font-size: 20px; letter-spacing: -.01em; }
-header .tag { color: var(--muted); }
+::selection { background: var(--ink); color: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 40px 64px; }
+
+/* masthead */
+header { display: flex; align-items: baseline; gap: 16px; padding: 28px 0 18px; border-bottom: 1px solid var(--ink); margin-bottom: 28px; }
+header .brand { font: 400 32px/1 var(--serif); letter-spacing: -.01em; }
+header .tag { font: 500 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+              padding-left: 16px; border-left: 1px solid var(--line-strong); }
 header .spacer { flex: 1; }
-.pill { font: 600 12px var(--mono); padding: 4px 10px; border-radius: 99px; background: var(--line); color: var(--muted); }
-.pill.live { background: var(--ok-tint); color: var(--ok-ink); } .pill.off { background: var(--bad-tint); color: var(--bad-ink); }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--float); }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px;
-       border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); font: 600 14px var(--sans); cursor: pointer; white-space: nowrap; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.small { height: 32px; padding: 0 12px; font-size: 13px; }
+.pill { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: none; padding: 0; }
+.pill::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 8px; vertical-align: 1px; }
+.pill.live { color: var(--ok-ink); } .pill.off { color: var(--bad-ink); }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; box-shadow: none; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 2px;
+       border: 1px solid var(--ink); background: transparent; color: var(--ink); font: 500 13.5px var(--sans); letter-spacing: .01em;
+       cursor: pointer; white-space: nowrap; transition: background .15s, color .15s, border-color .15s; }
+.btn:hover { background: var(--ink); color: var(--bg); }
+.btn.primary { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.btn.primary:hover { background: var(--accent); border-color: var(--accent); }
+.btn.small { height: 32px; padding: 0 13px; font-size: 12.5px; }
 .btn.rec { background: var(--bad); border-color: var(--bad); color: #fff; }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn:disabled:hover { background: transparent; color: var(--ink); }
+
 /* empty state */
-.hero { padding: 56px 32px; text-align: center; margin-top: 12px; }
-.hero h1 { font-size: 34px; letter-spacing: -.02em; margin: 0 0 8px; }
-.hero p.lead { color: var(--muted); font-size: 17px; margin: 0 auto 26px; max-width: 640px; }
-.hero .actions { display: flex; gap: 10px; justify-content: center; }
-.starts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 860px; margin: 0 auto; text-align: left; }
-.start { border: 1px solid var(--line-strong); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 4px; }
-.start b { font-size: 16px; } .start span { color: var(--muted); font-size: 14px; flex: 1; }
-.start .actions { justify-content: flex-start; margin-top: 10px; }
-.how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 36px auto 0; max-width: 860px; text-align: left; }
-.how div { border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-.how b { display: block; margin-bottom: 2px; }
-.how span { color: var(--muted); font-size: 14px; }
-.progress { margin: 16px auto 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; font: 500 12px var(--mono); color: var(--muted); }
-.progress span { padding: 4px 10px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
-.progress span.on { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-tint); }
-.progress span.done { color: var(--ok-ink); border-color: var(--ok); }
-.progress.left { justify-content: flex-start; margin: 10px 0 0; }
-.error { margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: var(--bad-tint); color: var(--bad-ink); font-weight: 500; }
-/* answers bar */
-.answers { padding: 18px 20px; margin-top: 4px; }
-.answers .head { display: flex; gap: 12px; align-items: center; }
-.answers .head h2 { margin: 0; font-size: 21px; letter-spacing: -.01em; flex: 1; }
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
-.tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; border-left-width: 5px; }
-.tile.ok { border-left-color: var(--ok); } .tile.warn { border-left-color: var(--warn); } .tile.bad { border-left-color: var(--bad); } .tile.none { border-left-color: var(--line-strong); }
-.tile small { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-.tile b { display: block; font: 700 22px var(--sans); letter-spacing: -.01em; margin: 2px 0; }
-.tile span { color: var(--muted); font-size: 13px; }
+.hero { padding: 64px 64px 56px; }
+.card.hero { background: none; border: 0; padding: 40px 0 8px; }   /* the start screen reads as a page, not a box */
+.hero .eyebrow, .start small, .how i { display: block; font: 500 11px var(--mono); font-style: normal; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.hero h1 { font: 400 84px/.98 var(--serif); letter-spacing: -.025em; margin: 18px 0 22px; max-width: 900px; }
+.hero h1 em { font-style: italic; color: var(--accent); }
+.hero p.lead { color: var(--muted); font-size: 18px; line-height: 1.6; margin: 0 0 48px; max-width: 620px; }
+.hero .actions { display: flex; gap: 10px; }
+.starts { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--ink); }
+.start { padding: 26px 36px 28px 0; display: flex; flex-direction: column; gap: 6px; }
+.start + .start { border-left: 1px solid var(--line); padding-left: 36px; }
+.start b { font: 400 30px/1.15 var(--serif); letter-spacing: -.01em; margin-top: 6px; }
+.start span { color: var(--muted); font-size: 15px; flex: 1; max-width: 460px; }
+.start .actions { justify-content: flex-start; margin-top: 16px; }
+.how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; margin: 52px 0 0; }
+.how div { border-top: 1px solid var(--line-strong); padding-top: 18px; }
+.how b { display: block; font: 400 23px/1.2 var(--serif); margin: 10px 0 6px; }
+.how span { color: var(--muted); font-size: 14.5px; }
+.progress { margin: 22px 0 0; display: flex; flex-wrap: wrap; gap: 8px 22px; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.progress span { padding: 0 0 4px; border-bottom: 1px solid transparent; }
+.progress span.on { color: var(--ink); border-bottom-color: var(--ink); }
+.progress span.done { color: var(--ok-ink); }
+.progress.left { justify-content: flex-start; margin: 12px 0 0; }
+.error { margin-top: 16px; padding: 12px 16px; border-left: 2px solid var(--bad); background: var(--bad-tint); color: var(--bad-ink); font-weight: 500; }
+
+/* answers */
+.answers { padding: 30px 36px 30px; margin-top: 0; }
+.answers .head { display: flex; gap: 12px; align-items: baseline; }
+.answers .head h2 { margin: 0; font: 400 42px/1.08 var(--serif); letter-spacing: -.015em; flex: 1; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 24px; border-top: 1px solid var(--ink); }
+.tile { padding: 20px 28px 2px 0; }
+.tile + .tile { border-left: 1px solid var(--line); padding-left: 28px; }
+.tile > small { display: flex; align-items: center; font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.tile > small::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); margin-right: 10px; flex: none; }
+.tile.ok > small::before { background: var(--ok); } .tile.warn > small::before { background: var(--warn); } .tile.bad > small::before { background: var(--bad); }
+.tile > b { display: block; font: 400 32px/1.12 var(--serif); letter-spacing: -.01em; margin: 12px 0 8px; }
+.tile.bad > b { color: var(--bad-ink); }
+.tile > span { color: var(--muted); font-size: 14px; }
+
 /* main */
-.main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr); gap: 16px; margin-top: 16px; align-items: start; }
-.canvas { position: sticky; top: 12px; padding: 12px; }
-.canvas .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; }
-.seg button { border: 0; background: var(--panel); padding: 7px 14px; font: 600 13px var(--sans); cursor: pointer; color: var(--ink); }
-.seg button.on { background: var(--ink); color: #fff; }
+.main { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(370px, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
+.canvas { position: sticky; top: 16px; padding: 18px 20px 16px; }
+.canvas .bar { display: flex; gap: 28px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.seg { display: inline-flex; gap: 20px; }
+.seg button { border: 0; border-bottom: 2px solid transparent; background: none; padding: 4px 0 10px; margin-bottom: -1px; font: 500 13.5px var(--sans); cursor: pointer; color: var(--muted); }
+.seg button:hover { color: var(--ink); }
+.seg button.on { color: var(--ink); border-bottom-color: var(--ink); }
 .seg button:disabled { color: var(--line-strong); cursor: not-allowed; }
-.canvas .hint { color: var(--muted); font-size: 13px; margin-left: auto; }
-.planbox { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+.canvas .hint { margin-left: auto; padding-bottom: 11px; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.planbox { border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: var(--paper); }
 .planbox svg { display: block; width: 100%; height: auto; max-height: 68vh; }
-.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 2px 0; font-size: 12px; color: var(--muted); }
-.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.legend { display: flex; gap: 22px; flex-wrap: wrap; padding: 14px 2px 0; font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px; }
+
 /* room panel */
-.panel { padding: 16px 18px; }
-.roomchips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.roomchips button { height: 30px; padding: 0 11px; border-radius: 99px; border: 1px solid var(--line-strong); background: var(--panel); cursor: pointer; font: 500 13px var(--sans); }
-.roomchips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.roomchips button.bed::before { content: "🛏 "; }
-.rhead { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; }
-.rhead h3 { margin: 0; font-size: 22px; letter-spacing: -.01em; flex: 1; }
-.rsub { color: var(--muted); font-size: 13px; }
-.sec { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
-.sec h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; gap: 8px; align-items: center; }
-.kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 14px; }
+.panel { padding: 22px 26px 26px; }
+.roomchips { display: flex; flex-wrap: wrap; gap: 4px 20px; padding-bottom: 14px; border-bottom: 1px solid var(--ink); }
+.roomchips button { padding: 4px 0; border: 0; border-bottom: 1px solid transparent; border-radius: 0; background: none; cursor: pointer; font: 500 14px var(--sans); color: var(--muted); }
+.roomchips button:hover { color: var(--ink); }
+.roomchips button.on { color: var(--ink); border-bottom-color: var(--ink); }
+.roomchips button.bed::before { content: ""; display: inline-block; width: 6px; height: 6px; background: var(--accent); margin-right: 8px; vertical-align: 2px; }
+.rhead { display: flex; align-items: center; gap: 12px; margin: 22px 0 6px; }
+.rhead h3 { margin: 0; font: 400 36px/1.08 var(--serif); letter-spacing: -.015em; flex: 1; }
+.rsub { color: var(--muted); font: 500 12px/1.5 var(--mono); letter-spacing: .02em; }
+.sec { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 18px; }
+.sec h4 { margin: 0 0 12px; font: 500 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 14.5px; }
 .kv .v { font: 500 13px var(--mono); text-align: right; }
-.chk { display: grid; grid-template-columns: 20px 1fr auto; gap: 5px 6px; font-size: 14px; }
+.chk { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px 8px; font-size: 14.5px; align-items: baseline; }
 .chk .v { color: var(--muted); font: 500 13px var(--mono); text-align: right; }
-.y { color: var(--ok-ink); font-weight: 700; } .n { color: var(--bad-ink); font-weight: 700; } .q { color: var(--warn-ink); font-weight: 700; }
-.chip { display: inline-block; font: 700 11px var(--mono); letter-spacing: .03em; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
-.chip.ok { background: var(--ok-tint); color: var(--ok-ink); } .chip.bad { background: var(--bad-tint); color: var(--bad-ink); }
-.chip.warn { background: var(--warn-tint); color: var(--warn-ink); } .chip.plain { background: var(--bg); color: var(--muted); }
-.note { color: var(--muted); font-size: 13px; margin-top: 6px; }
-.callout { border-radius: 10px; padding: 10px 12px; margin-top: 8px; font-size: 14px; }
-.callout.ok { background: var(--ok-tint); } .callout.warn { background: var(--warn-tint); } .callout.bad { background: var(--bad-tint); } .callout.info { background: var(--accent-tint); }
+.y { color: var(--ok-ink); font-weight: 600; } .n { color: var(--bad-ink); font-weight: 600; } .q { color: var(--warn-ink); font-weight: 600; }
+.chip { display: inline-block; font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; padding: 4px 8px; border: 1px solid currentColor; border-radius: 2px; background: none; white-space: nowrap; }
+.chip.ok { color: var(--ok-ink); } .chip.bad { color: var(--bad-ink); } .chip.warn { color: var(--warn-ink); }
+.chip.plain { color: var(--muted); border-color: var(--line-strong); }
+.note { color: var(--muted); font-size: 13.5px; margin-top: 8px; }
+.callout { border-left: 2px solid var(--line-strong); padding: 14px 16px; margin-top: 10px; font-size: 14px; }
+.callout.ok { background: var(--ok-tint); border-left-color: var(--ok); } .callout.warn { background: var(--warn-tint); border-left-color: var(--warn); }
+.callout.bad { background: var(--bad-tint); border-left-color: var(--bad); } .callout.info { background: var(--accent-tint); border-left-color: var(--accent); }
 .callout b { display: block; }
-.presets { display: flex; flex-wrap: wrap; gap: 6px; }
-.presets button { height: 32px; padding: 0 11px; border-radius: 99px; border: 1px solid var(--line-strong); background: var(--panel); cursor: pointer; font: 500 13px var(--sans); }
-.presets button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
-.row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
-.field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); font-weight: 600; }
-input[type=number] { width: 76px; height: 36px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 8px; font: 14px var(--sans); }
-footer { margin-top: 22px; color: var(--muted); font-size: 13px; text-align: center; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.presets button { height: 34px; padding: 0 14px; border-radius: 2px; border: 1px solid var(--line-strong); background: transparent; cursor: pointer; font: 500 13px var(--sans); color: var(--ink); }
+.presets button:hover { border-color: var(--ink); }
+.presets button.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+input[type=number] { width: 84px; height: 40px; border: 1px solid var(--line-strong); border-radius: 2px; padding: 0 10px; font: 500 14px var(--mono); background: var(--paper); color: var(--ink); }
+input:focus { outline: none; border-color: var(--ink); }
+footer { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line-strong); color: var(--muted); font: 500 11.5px/1.7 var(--mono); letter-spacing: .02em; max-width: 900px; }
+
 /* plan svg */
-.room { stroke-width: 2.5; vector-effect: non-scaling-stroke; fill-opacity: .12; cursor: pointer; transition: fill-opacity .15s; }
-.room:hover { fill-opacity: .28; }
-.room.ok { stroke: var(--ok); fill: var(--ok); } .room.est { stroke: var(--warn); fill: var(--warn); stroke-dasharray: 7 5; }
+.room { stroke-width: 2; vector-effect: non-scaling-stroke; fill-opacity: .1; cursor: pointer; transition: fill-opacity .15s; }
+.room:hover { fill-opacity: .22; }
+.room.ok { stroke: var(--ok); fill: var(--ok); } .room.est { stroke: var(--warn); fill: var(--warn); stroke-dasharray: 6 5; }
 .room.fail { stroke: var(--bad); fill: var(--bad); }
-.room.sel { stroke: var(--accent); fill: var(--accent); fill-opacity: .22; stroke-width: 5; stroke-dasharray: none; }
-.fitrect { stroke-width: 3; vector-effect: non-scaling-stroke; fill-opacity: .5; pointer-events: none; }
-/* 3D — ids/classes used by three3d.js */
-#view3d { position: relative; height: 68vh; min-height: 420px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.room.sel { stroke: var(--accent); fill: var(--accent); fill-opacity: .16; stroke-width: 3.5; stroke-dasharray: none; }
+.fitrect { stroke-width: 2.5; vector-effect: non-scaling-stroke; fill-opacity: .4; cursor: grab; touch-action: none; }
+.fitrect.dragging { cursor: grabbing; fill-opacity: .28; }
+.fitlabel { font-family: var(--mono); font-weight: 600; letter-spacing: .06em; fill: var(--ink); paint-order: stroke; stroke: var(--paper); stroke-width: 4px; pointer-events: none; }
+.route { fill: none; stroke: var(--accent); stroke-width: 2.5; vector-effect: non-scaling-stroke; stroke-dasharray: 2 6; stroke-linecap: round; pointer-events: none; }
+.fitctl { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.fitctl .btn { height: 30px; padding: 0 11px; font-size: 12px; }
+
+/* 3D: ids/classes used by three3d.js */
+#view3d { position: relative; height: 68vh; min-height: 420px; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: var(--paper); }
 #view3d canvas { display: block; }
 .labels3d { position: absolute; top: 0; left: 0; pointer-events: none; }
-.label3d { pointer-events: auto; cursor: pointer; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 99px;
-           padding: 3px 10px; font: 500 11px var(--mono); display: flex; gap: 6px; white-space: nowrap; box-shadow: var(--float); }
+.label3d { pointer-events: auto; cursor: pointer; background: var(--paper); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 2px;
+           padding: 3px 9px; font: 500 10.5px var(--mono); letter-spacing: .04em; display: flex; gap: 6px; white-space: nowrap; box-shadow: none; }
 .label3d span { color: var(--muted); } .label3d.fail { border-color: var(--bad); color: var(--bad-ink); }
-.label3d.unverified { border-style: dashed; border-color: var(--warn); } .label3d.entrance { color: var(--accent-ink); font-weight: 700; pointer-events: none; }
-.view3d-caption { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2; background: rgba(15,23,42,.88); color: #fff;
-                  padding: 7px 14px; border-radius: 8px; font: 600 12px var(--mono); white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
-.view3d-caption.fail { background: #991b1b; }
-#view3d-reset { position: absolute; right: 12px; top: 12px; z-index: 3; }
+.label3d.unverified { border-style: dashed; border-color: var(--warn); } .label3d.entrance { color: var(--accent-ink); font-weight: 600; pointer-events: none; }
+.view3d-caption { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; background: rgba(26, 25, 21, .92); color: var(--bg);
+                  padding: 8px 14px; border-radius: 2px; font: 500 11px var(--mono); letter-spacing: .06em; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+.view3d-caption.fail { background: #7d2f21; }
+#view3d-reset { position: absolute; right: 12px; top: 12px; z-index: 3; background: var(--paper); }
+
 /* CAD view of a filmed room (cad3d.js) */
-#cad3d { position: relative; height: 68vh; min-height: 440px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #f6f7f9; }
+#cad3d { position: relative; height: 68vh; min-height: 440px; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #f7f5ef; }
 #cad3d canvas { display: block; }
-.cad-tools { position: absolute; left: 0; right: 0; top: 0; z-index: 5; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); font-weight: 600;
-             padding: 8px 10px; background: rgba(246, 247, 249, .94); border-bottom: 1px solid var(--line); }
-.cad-tools button { height: 30px; padding: 0 10px; border-radius: 99px; border: 1px solid var(--line-strong); background: #fff; cursor: pointer; font: 600 12px var(--sans); }
-.cad-tools button:hover { border-color: var(--accent); color: var(--accent-ink); }
-.cad-hud { position: absolute; left: 10px; bottom: 10px; z-index: 5; background: rgba(15,23,42,.88); color: #fff; padding: 7px 12px; border-radius: 8px; font: 600 12px var(--mono); max-width: calc(100% - 20px); }
-.cad-hud.ok { background: #047857; } .cad-hud.warn { background: #b45309; } .cad-hud.bad { background: #b91c1c; }
-#cad-agent { margin-top: 10px; }
-.cad-ask { display: flex; gap: 6px; }
-.cad-ask input { flex: 1; min-width: 0; height: 38px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 12px; font: 14px var(--sans); background: #fff; }
-.cad-ask .btn { height: 38px; }
-.cad-say { margin-top: 8px; max-height: 260px; overflow: auto; background: #fff; border: 1px solid var(--accent); color: var(--ink);
-           border-radius: 10px; padding: 9px 11px; font-size: 13px; }
-.cad-say > div + div { margin-top: 6px; }
-.cad-say .ok-line { color: var(--ok-ink); font-weight: 600; } .cad-say .warn-line { color: var(--warn-ink); }
-.cad-say .sugs b { display: block; margin-bottom: 4px; }
-.cad-say .opt { display: flex; gap: 8px; align-items: flex-start; margin-top: 5px; }
-.cad-say .opt button { flex: none; height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; font: 600 12px var(--sans); cursor: pointer; }
-.cad-tools button:disabled { opacity: .45; cursor: not-allowed; }
-.dim3d { font: 700 11px var(--mono); background: #fff; color: #1d4ed8; border: 1px solid #1d4ed8; border-radius: 6px; padding: 1px 6px; white-space: nowrap; pointer-events: none; }
-.dim3d.ok { color: #047857; border-color: #059669; } .dim3d.bad { color: #b91c1c; border-color: #dc2626; }
-.dim3d.tag { color: var(--muted); border-color: var(--line-strong); font-weight: 500; }
+.cad-tools { position: absolute; left: 0; right: 0; top: 0; z-index: 5; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+             font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+             padding: 9px 12px; background: rgba(247, 245, 239, .95); border-bottom: 1px solid var(--line); }
+.cad-tools button { height: 30px; padding: 0 11px; border-radius: 2px; border: 1px solid var(--line-strong); background: var(--paper); cursor: pointer;
+                    font: 500 12px var(--sans); letter-spacing: 0; text-transform: none; color: var(--ink); }
+.cad-tools button:hover { border-color: var(--ink); }
+.cad-hud { position: absolute; left: 12px; bottom: 12px; z-index: 5; background: rgba(26, 25, 21, .92); color: var(--bg); padding: 8px 12px; border-radius: 2px;
+           font: 500 11px var(--mono); letter-spacing: .04em; max-width: calc(100% - 24px); }
+.cad-hud.ok { background: var(--ok-ink); } .cad-hud.warn { background: var(--warn-ink); } .cad-hud.bad { background: var(--bad-ink); }
+#cad-agent { margin-top: 12px; }
+.cad-ask { display: flex; gap: 8px; }
+.cad-ask input { flex: 1; min-width: 0; height: 40px; border: 1px solid var(--line-strong); border-radius: 2px; padding: 0 12px; font: 14px var(--sans); background: var(--paper); color: var(--ink); }
+.cad-ask .btn { height: 40px; }
+.cad-say { margin-top: 10px; max-height: 260px; overflow: auto; background: var(--paper); border: 1px solid var(--line); border-left: 2px solid var(--accent); color: var(--ink);
+           border-radius: 0; padding: 12px 14px; font-size: 13.5px; }
+.cad-say > div + div { margin-top: 8px; }
+.cad-say .ok-line { color: var(--ok-ink); font-weight: 500; } .cad-say .warn-line { color: var(--warn-ink); }
+.cad-say .sugs b { display: block; margin-bottom: 6px; font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.cad-say .opt { display: flex; gap: 10px; align-items: flex-start; margin-top: 6px; }
+.cad-say .opt button { flex: none; height: 28px; padding: 0 11px; border-radius: 2px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg); font: 500 12px var(--sans); cursor: pointer; }
+.cad-say .opt button:hover { background: var(--accent); border-color: var(--accent); }
+.cad-tools button:disabled { opacity: .4; cursor: not-allowed; }
+.dim3d { font: 500 10.5px var(--mono); letter-spacing: .02em; background: var(--paper); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 2px; padding: 1px 6px; white-space: nowrap; pointer-events: none; }
+.dim3d.ok { color: var(--ok-ink); border-color: var(--ok); } .dim3d.bad { color: var(--bad-ink); border-color: var(--bad); }
+.dim3d.tag { color: var(--muted); border-color: var(--line-strong); }
 .dim3d.piece { color: var(--ink); border-color: var(--line-strong); font-weight: 600; }
-@media (max-width: 960px) { .main, .tiles, .how, .starts { grid-template-columns: 1fr; } .canvas { position: static; } }
+
+@media (max-width: 960px) {
+  .wrap { padding: 0 18px 48px; }
+  .main, .tiles, .how, .starts { grid-template-columns: 1fr; }
+  .canvas { position: static; }
+  .hero { padding: 40px 24px; } .hero h1 { font-size: 52px; }
+  .start + .start, .tile + .tile { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); }
+}
 </style>
 <script type="importmap">
   { "imports": {
@@ -160,7 +210,7 @@ footer { margin-top: 22px; color: var(--muted); font-size: 13px; text-align: cen
 <body>
 <div class="wrap">
   <header>
-    <span class="brand">Footprint</span><span class="tag">Is that 2BR actually a 2BR?</span>
+    <span class="brand">Footprint</span><span class="tag">NYC listings, verified</span>
     <span class="spacer"></span>
     <button class="btn small" id="new-plan" hidden>Start over</button>
     <span class="pill" id="health">checking backend…</span>
@@ -168,22 +218,23 @@ footer { margin-top: 22px; color: var(--muted); font-size: 13px; text-align: cen
 
   <!-- ============ empty state ============ -->
   <section class="card hero" id="empty">
-    <h1>Is that 2BR actually a 2BR?</h1>
+    <span class="eyebrow">An apartment listing, checked against its own floor plan</span>
+    <h1>Is that 2BR <em>actually</em> a 2BR?</h1>
     <p class="lead">Drop in a listing's floor plan. Footprint rebuilds the apartment, checks every bedroom against NYC rules,
        and lets you film a room at the viewing and try your furniture before you sign.</p>
     <div class="starts">
-      <div class="start"><b>I have the listing's floor plan</b><span>Check bedrooms and square footage before you visit.</span>
+      <div class="start"><small>Before the viewing</small><b>I have the listing's floor plan</b><span>Check the bedrooms and the square footage before you visit.</span>
         <div class="actions"><label class="btn primary">Upload floor plan<input id="plan-file" type="file" accept="image/*" hidden></label>
           <button class="btn" id="plan-sample">Try a sample</button></div></div>
-      <div class="start"><b>I'm at the apartment: no plan</b><span>Film one room for 15–30 s. Get its real size, ceiling height and a 3D model to fit furniture.</span>
+      <div class="start"><small>At the viewing</small><b>I'm in the apartment, no plan</b><span>Film one room for 15–30 s. Get its real size, ceiling height and a 3D model to fit furniture in.</span>
         <div class="actions"><label class="btn primary">Upload a room video<input id="video-only" type="file" accept="video/*" hidden></label></div></div>
     </div>
     <div class="progress" id="p1" hidden></div>
     <div class="error" id="e1" hidden></div>
     <div class="how">
-      <div><b>1 · The listing, checked</b><span>Real bedroom count and square footage, from the plan's own dimensions.</span></div>
-      <div><b>2 · A room, measured</b><span>Film it for 20 s at the viewing: real size and ceiling height, compared with the plan.</span></div>
-      <div><b>3 · Your furniture, placed</b><span>Bed, sofa, desk: placed with walkway space and a clear way out.</span></div>
+      <div><i>01</i><b>The listing, checked</b><span>Real bedroom count and square footage, from the plan's own dimensions.</span></div>
+      <div><i>02</i><b>A room, measured</b><span>Film it for 20 s at the viewing: real size and ceiling height, compared with the plan.</span></div>
+      <div><i>03</i><b>Your furniture, placed</b><span>Bed, sofa, desk: placed with walkway space and a clear way out.</span></div>
     </div>
   </section>
 
@@ -211,12 +262,12 @@ footer { margin-top: 22px; color: var(--muted); font-size: 13px; text-align: cen
           <div class="cad-tools"><span>Try in this room:</span>
             <button data-add="King bed|6.33|6.67|2">+ King bed</button><button data-add="Queen bed|5|6.67|2">+ Queen bed</button>
             <button data-add="Sofa|7|3|2.8">+ Sofa</button><button data-add="Desk|5|2.5|2.5">+ Desk</button>
-            <button id="cad-undo" disabled>↶ Undo</button></div>
+            <button id="cad-undo" disabled>Undo</button></div>
           <div id="cad-hud" class="cad-hud"></div>
         </div>
         <div id="cad-agent" hidden>             <!-- below the 3D view, never on top of it -->
           <form class="cad-ask" id="cad-ask"><input id="cad-text" autocomplete="off"
-              placeholder="Tell it what to do: “put a queen bed under the window and a desk by the door”, “show me other layouts”">
+              placeholder="Tell it what to do: “put a queen bed under the window and a desk by the door”, “show me another layout”">
             <button class="btn primary small" type="submit">Do it</button></form>
           <div id="cad-say" class="cad-say" hidden></div>
         </div>
@@ -438,7 +489,7 @@ function measureSection(r, scan) {
   if (S.scanning === r.id) body = `<div class="progress left" id="p2"></div><div class="note">You can keep looking at other rooms meanwhile.</div>`;
   else if (S.scanning) body = `<div class="note" style="margin-top:0">Measuring ${esc(planRoom(S.scanning)?.label || "another room")} from your video… you can film this one next.</div>`;
   else if (!scan) body = `<div class="note" style="margin-top:0">At the viewing, film this room for 15–30 s: stand in a corner, pan slowly,
-      keep the door in frame and show floor and ceiling.</div><div class="row"><button class="btn primary" id="scan-btn">📹 Upload a video of ${esc(r.label)}</button></div>`;
+      keep the door in frame and show floor and ceiling.</div><div class="row"><button class="btn primary" id="scan-btn">Upload a video of ${esc(r.label)}</button></div>`;
   else body = scanResult(r, scan) + `<div class="row"><button class="btn small" id="scan-btn">Replace video</button></div>`;
   return `<div class="sec"><h4>Measure it with your phone</h4>${body}<div class="error" id="e2" hidden></div></div>`;
 }
@@ -485,19 +536,25 @@ function fitSection(r, scan) {
       <label class="field">Depth ft<input type="number" id="fit-d" step="0.1" min="0.5" value="${f.d}"></label>
       <label class="field">Walkway ft<input type="number" id="fit-c" step="0.5" min="0" value="${f.c}"></label>
       <button class="btn primary" id="fit-go" ${blocked ? "disabled" : ""}>Check fit</button>
-      <button class="btn" id="voice-btn" title="e.g. 'Will a 7-foot sofa fit in the living room?'">${S.busy === "voice" ? "■ Stop & ask" : "🎙 Ask"}</button>
+      <button class="btn" id="voice-btn" title="e.g. 'Will a 7-foot sofa fit in the living room?'">${S.busy === "voice" ? "Stop and ask" : "Ask by voice"}</button>
     </div>
     ${blocked ? `<div class="callout warn">${blocked}</div>` : ""}
     <div id="fit-res">${S.fit && S.fit.room === r.id ? fitHTML(S.fit) : ""}</div><div class="error" id="e3" hidden></div></div>`;
 }
+const VERDICT = { fits: ["ok", "FITS"], tight: ["warn", "TIGHT"], blocks_path: ["bad", "BLOCKS THE WAY OUT"], no_fit: ["bad", "DOESN'T FIT"], unknown: ["warn", "CAN'T TELL"] };
 function fitHTML(f) {
-  const head = f.fits === true ? chip("ok", "FITS") : f.fits === false ? chip("bad", "DOESN'T FIT") : chip("warn", "CAN'T TELL");
-  const path = f.path?.ok === true ? `${chip("ok", "WAY OUT CLEAR")} every bedroom can still reach the entrance`
-             : f.path?.ok === false ? `${chip("bad", "BLOCKS THE WAY OUT")} ${esc(f.path.reason || "")}` : "";
-  return `<div class="callout ${f.fits === true ? "ok" : f.fits === false ? "bad" : "warn"}" style="margin-top:10px">
+  const [cls, word] = VERDICT[f.verdict] || VERDICT.unknown;
+  const path = f.verdict === "blocks_path" ? "" : f.path?.ok === true ? `${chip("ok", "WAY OUT CLEAR")} every bedroom can still reach the entrance (dotted line)`
+             : f.path?.ok === false ? `${chip("bad", "WAY OUT BLOCKED")} ${esc(f.path.reason || "")}` : "";
+  const n = f.spots?.length || 0, where = f.manual ? "your spot" : n ? `spot ${f.spotIdx + 1} of ${n}` : "";
+  return `<div class="callout ${cls}" style="margin-top:10px">
     ${f.heard ? `<div class="note" style="margin:0 0 4px">Heard: “${esc(f.heard)}”</div>` : ""}
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="display:inline">${f.w_ft} × ${f.d_ft} ft</b>${head}</div>
-    <div class="note" style="margin-top:4px">${esc(f.reason || "")}</div>${path ? `<div class="note">${path}</div>` : ""}</div>`;
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="display:inline">${f.w_ft} × ${f.d_ft} ft</b>${chip(cls, word)}${where ? `<span class="chip plain">${where}</span>` : ""}</div>
+    <div class="note" style="margin-top:4px">${esc(f.reason || "")}</div>${path ? `<div class="note">${path}</div>` : ""}
+    ${f.poly ? `<div class="fitctl"><button class="btn" id="fit-turn">↻ Turn 90°</button>
+      ${n > 1 ? `<button class="btn" id="fit-next">Next spot →</button>` : ""}${(f.manual || f.spotIdx) && n ? `<button class="btn" id="fit-best">Best spot</button>` : ""}
+      <span class="note" style="margin:0">Or drag it on the 2D plan to try your own spot.</span></div>` : ""}
+    ${f.checking ? `<div class="note">Checking this spot…</div>` : ""}</div>`;
 }
 function wireRoom(r) {
   const sb = $("scan-btn"); if (sb) sb.onclick = () => { const inp = S.videoOnly ? $("video-only") : $("scan-file"); inp.value = ""; inp.click(); };
@@ -506,6 +563,9 @@ function wireRoom(r) {
     S.form = { ...S.form, w: +$("fit-w").value, d: +$("fit-d").value, c: +$("fit-c").value, preset: null };
     $("presets").querySelectorAll("button").forEach((b) => b.classList.remove("on")); }));
   $("fit-go") && ($("fit-go").onclick = checkFit);
+  $("fit-turn") && ($("fit-turn").onclick = () => turnFit());
+  $("fit-next") && ($("fit-next").onclick = () => showSpot((S.fit.spotIdx + 1) % S.fit.spots.length));
+  $("fit-best") && ($("fit-best").onclick = () => showSpot(0));
   $("voice-btn") && ($("voice-btn").onclick = voice);
   if (S.scanning === r.id && $("p2") && S.stopScan?.el !== $("p2")) { S.stopScan?.();
     S.stopScan = Object.assign(stages($("p2"), ["Uploading video", "Measuring walls", "Cross-checking", "Drawing the room"], 6000), { el: $("p2") }); }
@@ -613,9 +673,12 @@ function drawPlan(svg, m, img, selId, fit, clickable) {
     s += `<polygon class="room ${roomClass(m, r, selId)}" data-id="${esc(r.id)}" points="${r.polygon.map((p) => p.join(",")).join(" ")}"><title>${esc(tip)}</title></polygon>`;
   }
   if (m.entrance) s += `<circle cx="${m.entrance[0]}" cy="${m.entrance[1]}" r="${fs * 0.55}" fill="var(--accent)" stroke="#fff" stroke-width="3"><title>Entrance</title></circle>`;
-  if (fit?.poly) { const c = fit.fits ? "var(--ok)" : "var(--bad)";
-    s += `<polygon class="fitrect" points="${fit.poly.map((p) => p.join(",")).join(" ")}" fill="${c}" stroke="${c}" ${fit.fits ? "" : 'stroke-dasharray="8 6"'}/>`; }
+  if (fit?.path?.ok && fit.path.path?.length > 1) s += `<polyline class="route" points="${fit.path.path.map((p) => p.join(",")).join(" ")}"><title>Way out to the entrance</title></polyline>`;
+  if (fit?.poly) { const c = { ok: "var(--ok)", warn: "var(--warn)", bad: "var(--bad)" }[(VERDICT[fit.verdict] || VERDICT.unknown)[0]], [cx, cy] = centroid(fit.poly);
+    s += `<polygon class="fitrect" points="${fit.poly.map((p) => p.join(",")).join(" ")}" fill="${c}" stroke="${c}" ${fit.verdict === "fits" ? "" : 'stroke-dasharray="8 6"'}><title>Drag to move</title></polygon>`;
+    s += `<text class="fitlabel" x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${fs * 0.9}">${esc(fit.name || "")}</text>`; }
   svg.innerHTML = s;
+  if (fit?.poly) dragFit(svg);
   if (clickable) svg.querySelectorAll(".room").forEach((p) => (p.onclick = () => selectRoom(p.dataset.id)));
 }
 
@@ -631,17 +694,67 @@ async function checkFit() {
     setFit(res.fit, res.clear_path, q, m, room, video);
   } catch (err) { $("fit-res").innerHTML = ""; showErr("e3", `Fit check failed: ${err.message}`); }
 }
-function setFit(fit, path, q, m, room, video, heard) {
+function setFit(fit, path, q, m, room, video, heard) {   // the solver's best spot; never a made-up one
   fit = fit || {};
-  let poly = fit.placement || null;
-  if (!poly && room?.polygon && m.scale_px_per_ft) {   // doesn't fit: show the requested size at the room centre, in red
-    const [cx, cy] = centroid(room.polygon), w = q.w_ft * m.scale_px_per_ft / 2, d = q.d_ft * m.scale_px_per_ft / 2;
-    poly = [[cx - w, cy - d], [cx + w, cy - d], [cx + w, cy + d], [cx - w, cy + d]];
-  }
-  S.fit = { room: S.sel, video, fits: fit.fits, reason: fit.reason, poly, path, heard, w_ft: q.w_ft, d_ft: q.d_ft, clearance_ft: q.clearance_ft,
+  const verdict = fit.verdict || (fit.fits === true ? "fits" : fit.fits === false ? "no_fit" : "unknown");
+  S.fit = { room: S.sel, video, fits: fit.fits, verdict, reason: fit.reason, poly: fit.placement || null, path, heard,
+            w_ft: q.w_ft, d_ft: q.d_ft, clearance_ft: q.clearance_ft ?? fit.requested_walkway_ft,
             name: S.form.preset != null ? PRESETS[S.form.preset].name : "your furniture",
-            center_px: fit.center_px, rotation_deg: fit.rotation_deg };
+            center_px: fit.center_px, rotation_deg: fit.rotation_deg || 0, spots: fit.spots || [], spotIdx: 0, manual: false,
+            best: { fit, path }, model_id: m.model_id, room_label: room?.label };
   renderRoom(); renderCanvas();
+}
+function rectPoly([cx, cy], w, d, rot) {       // w along x at 0°, rotated about the centre (same as the server)
+  const a = rot * Math.PI / 180, u = [Math.cos(a), Math.sin(a)], v = [-Math.sin(a), Math.cos(a)];
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => [cx + sx * w / 2 * u[0] + sy * d / 2 * v[0], cy + sx * w / 2 * u[1] + sy * d / 2 * v[1]]);
+}
+let spotSeq = 0;
+async function placeFit(center, rot, extra = {}) {   // move the piece (instant), then ask the server what that spot means
+  const f = S.fit, { m } = current(); if (!f || !m?.scale_px_per_ft) return;
+  const k = m.scale_px_per_ft, seq = ++spotSeq;
+  Object.assign(f, { center_px: center, rotation_deg: rot, poly: rectPoly(center, f.w_ft * k, f.d_ft * k, rot), checking: true }, extra);
+  renderRoom(); renderCanvas();
+  try {
+    const res = await api("/check_placement", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_id: f.model_id, room_label: f.room_label, w_ft: f.w_ft, d_ft: f.d_ft, center_px: center, rotation_deg: rot, clearance_ft: f.clearance_ft }) }, 20000, 0);
+    if (seq !== spotSeq || S.fit !== f) return;          // a newer move already happened
+    Object.assign(f, { fits: res.fit?.fits, verdict: res.fit?.verdict || "unknown", reason: res.fit?.reason || res.errors?.[0]?.error || "", path: res.clear_path, checking: false });
+  } catch (err) { if (seq === spotSeq) Object.assign(f, { checking: false, verdict: "unknown", reason: `Couldn't check this spot: ${err.message}` }); }
+  if (S.fit === f) { renderRoom(); renderCanvas(); }
+}
+function showSpot(i) {                       // a solver spot: 0 = the best one (its verdict is already known)
+  const f = S.fit, sp = f?.spots?.[i]; if (!sp) return;
+  if (i === 0 && f.best) { const b = f.best;
+    Object.assign(f, { spotIdx: 0, manual: false, fits: b.fit.fits, verdict: b.fit.verdict, reason: b.fit.reason, path: b.path, poly: b.fit.placement,
+                       center_px: b.fit.center_px, rotation_deg: b.fit.rotation_deg || 0, checking: false });
+    return (renderRoom(), renderCanvas()); }
+  placeFit(sp.center_px, sp.rotation_deg || 0, { spotIdx: i, manual: false });
+}
+function turnFit() {                         // turn 90° in place, nudged back inside the room's box if it pokes out
+  const f = S.fit, { m, room } = current(); if (!f?.center_px || !room?.polygon) return;
+  const rot = ((f.rotation_deg || 0) + 90) % 180, k = m.scale_px_per_ft, p = rectPoly(f.center_px, f.w_ft * k, f.d_ft * k, rot);
+  const bx = (pts, i) => [Math.min(...pts.map((q) => q[i])), Math.max(...pts.map((q) => q[i]))];
+  const c = [...f.center_px];
+  for (const i of [0, 1]) { const [lo, hi] = bx(p, i), [rlo, rhi] = bx(room.polygon, i);
+    if (lo < rlo) c[i] += rlo - lo; else if (hi > rhi) c[i] -= hi - rhi; }
+  placeFit(c, rot, { manual: true });
+}
+function dragFit(svg) {                      // drag the piece on the 2D plan; drop = check that spot
+  const g = svg.querySelector(".fitrect"), lab = svg.querySelector(".fitlabel"); if (!g) return;
+  g.onpointerdown = (e) => {
+    e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add("dragging");
+    const inv = svg.getScreenCTM().inverse(), at = (ev) => { const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(inv); return [p.x, p.y]; };
+    const p0 = at(e), poly0 = S.fit.poly.map((q) => [...q]), c0 = [...S.fit.center_px], l0 = [+lab.getAttribute("x"), +lab.getAttribute("y")];
+    let d = [0, 0];
+    g.onpointermove = (ev) => { const p = at(ev); d = [p[0] - p0[0], p[1] - p0[1]];
+      g.setAttribute("points", poly0.map(([x, y]) => `${x + d[0]},${y + d[1]}`).join(" "));
+      lab.setAttribute("x", l0[0] + d[0]); lab.setAttribute("y", l0[1] + d[1]); };
+    g.onpointerup = g.onpointercancel = () => { g.onpointermove = g.onpointerup = g.onpointercancel = null; g.classList.remove("dragging");
+      if (Math.hypot(...d) < 2) return;
+      const { w, h } = current().m.image, hx = Math.max(...poly0.map((q) => q[0])) - c0[0], hy = Math.max(...poly0.map((q) => q[1])) - c0[1];
+      const clamp = (v, half, max) => Math.max(half, Math.min(max - half, v));   // the whole piece stays on the plan, grabbable
+      placeFit([clamp(c0[0] + d[0], hx, w), clamp(c0[1] + d[1], hy, h)], S.fit.rotation_deg || 0, { manual: true }); };
+  };
 }
 
 // ================= voice =================
@@ -686,8 +799,8 @@ async function toWav(blob) {                  // browser recordings are webm/ogg
 }
 </script>
 <!-- ?v= stamps make browsers fetch the current 3D modules instead of a cached older copy -->
-<script type="module" src="three3d.js?v=1641"></script>
-<script type="module" src="cad3d.js?v=1640"></script>
+<script type="module" src="three3d.js?v=1642"></script>
+<script type="module" src="cad3d.js?v=1803"></script>
 <script>
 document.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => {
   const [label, w, d, h] = b.dataset.add.split("|"); if (!window.FootprintCAD) return;
@@ -699,50 +812,60 @@ const CAD = () => window.FootprintCAD, undoStack = [];
 function remember() { undoStack.push(CAD().snapshot()); if (undoStack.length > 20) undoStack.shift(); $("cad-undo").disabled = false; }
 $("cad-undo").onclick = () => { const s = undoStack.pop(); if (s) CAD().restore(s); $("cad-undo").disabled = !undoStack.length; sayHTML(`<div>Undone.</div>`); };
 function sayHTML(html, append = false) { const b = $("cad-say"); b.hidden = false; b.innerHTML = append ? b.innerHTML + html : html; }
+const agentLog = [];                      // memory: recent requests and what the agent did (the layout itself is sent every time)
 async function askAgent(text, issues = [], withShot = true) {   // fix requests skip the screenshot: lighter, faster
   return api("/cad_agent", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, ...CAD().describe(), image_b64: withShot ? CAD().screenshot() : null, issues }) }, 100000);
+    body: JSON.stringify({ text, ...CAD().describe(), image_b64: withShot ? CAD().screenshot() : null, issues, history: agentLog.slice(-6) }) }, 75000, 0);
 }
-async function critic() {          // after any change: check deterministically; if cramped, ask for fixes
-  const issues = CAD().check();
+const HARD = /overlaps|door|out of the room/;
+const fresh = (list) => { const base = CAD().baseline?.() || []; return list.filter((i) => !base.includes(i)); };   // not what the video already showed
+function notesHTML(notes) { return notes?.length ? `<div class="note">Adjusted so nothing overlaps: ${notes.map(esc).join("; ")}.</div>` : ""; }
+async function critic(findFixes = true) {   // after any change: check deterministically; offer only fixes that are tested to help
+  const issues = fresh(CAD().check());
   if (!issues.length) return sayHTML(`<div class="ok-line">✓ No overlaps, the door swings clear, walkways are 2 ft or more.</div>`, true);
-  const top = [...issues].sort((a, b) => /overlaps|door|out of the room/.test(b) - /overlaps|door|out of the room/.test(a));   // hard problems first
-  sayHTML(`<div class="warn-line">${issues.length} problem${issues.length > 1 ? "s" : ""}: ${top.slice(0, 3).map(esc).join("; ")}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ""}. Looking for fixes…</div>`, true);
+  const top = [...issues].sort((a, b) => HARD.test(b) - HARD.test(a));   // hard problems first
+  sayHTML(`<div class="warn-line">${issues.length} problem${issues.length > 1 ? "s" : ""}: ${top.slice(0, 3).map(esc).join("; ")}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ""}.</div>`, true);
+  if (!findFixes) {
+    sayHTML(`<div class="opt"><button id="cad-fixes">Find a fix</button><span></span></div>`, true);
+    $("cad-fixes").onclick = () => { $("cad-fixes").parentElement.remove(); critic(true); };
+    return;
+  }
+  sayHTML(`<div class="note" id="cad-looking">Looking for a fix…</div>`, true);
   try {
-    const res = await askAgent("The layout has the problems listed. Suggest alterations that fix them.", issues.slice(0, 4), false);
-    const sug = res.suggestions?.length ? res.suggestions : res.actions?.length ? [{ text: res.say || "Suggested fix", actions: res.actions }] : [];
-    if (!sug.length) return sayHTML(`<div class="note">No fix suggested. Try moving the red pieces by hand.</div>`, true);
-    sayHTML(`<div class="sugs"><b>Suggested fixes</b>${sug.map((s, i) => `<div class="opt"><button data-sug="${i}">Apply</button><span>${esc(s.text)}</span></div>`).join("")}</div>`, true);
+    const res = await askAgent("The layout has the problems listed. Suggest alterations that fix them.", top.slice(0, 4), false);
+    $("cad-looking")?.remove();
+    const raw = res.suggestions?.length ? res.suggestions : res.actions?.length ? [{ text: res.say || "Suggested fix", actions: res.actions }] : [];
+    const score = (list) => list.filter((i) => HARD.test(i)).length * 10 + list.length;
+    const tested = raw.map((s) => { const t = CAD().trial(s.actions); return { ...s, notes: t.notes, issues: fresh(t.issues) }; })
+                      .filter((s) => score(s.issues) < score(issues))
+                      .sort((a, b) => score(a.issues) - score(b.issues));
+    if (!tested.length) return sayHTML(`<div class="note">No suggested fix actually helped when I tested it. Try removing a piece, a smaller size, or dragging the red pieces.</div>`, true);
+    sayHTML(`<div class="sugs"><b>Tested fixes</b>${tested.map((s, i) => `<div class="opt"><button data-sug="${i}">Apply</button><span>${esc(s.text)}
+      <span class="note">(${s.issues.length ? `leaves ${s.issues.length} problem${s.issues.length > 1 ? "s" : ""}` : "fixes everything"})</span></span></div>`).join("")}</div>`, true);
     $("cad-say").querySelectorAll("[data-sug]").forEach((b) => (b.onclick = async () => {
-      remember(); CAD().apply(sug[+b.dataset.sug].actions);
-      sayHTML(`<div>Applied: ${esc(sug[+b.dataset.sug].text)}</div>`); await critic();
+      const sg = tested[+b.dataset.sug]; remember(); const notes = CAD().apply(sg.actions);
+      agentLog.push(`fix applied -> ${sg.text}`);
+      sayHTML(`<div>Applied: ${esc(sg.text)}</div>${notesHTML(notes)}`); await critic(false);
     }));
-  } catch (err) { sayHTML(`<div class="note">Couldn't get fixes: ${esc(err.message)}</div>`, true); }
+  } catch (err) { $("cad-looking")?.remove(); sayHTML(`<div class="note">Couldn't get a fix: ${esc(err.message)}</div>`, true); }
 }
 $("cad-ask").onsubmit = async (e) => {
   e.preventDefault();
-  const text = $("cad-text").value.trim();
-  if (!text || !CAD()) return;
-  sayHTML(`<div class="note">Thinking… (looking at your 3D view)</div>`);
-  const base = CAD().snapshot();
+  const text = $("cad-text").value.trim(), btn = $("cad-ask").querySelector("button");
+  if (!text || !CAD() || btn.disabled) return;
+  btn.disabled = true; sayHTML(`<div class="note">Thinking… (looking at your 3D view)</div>`);
   try {
-    const res = await askAgent(text);          // the checker runs after the change (critic)
+    const res = await askAgent(text);
     if (res.error) throw new Error(res.error);
     $("cad-text").value = "";
-    if (res.options?.length) {     // other arrangements: preview any of them; each starts from the layout you had
-      sayHTML(`<div>${esc(res.say || "Here are some other ways to arrange this room:")}</div><div class="sugs">` +
-        res.options.map((o, i) => `<div class="opt"><button data-opt="${i}">${esc(o.name)}</button><span>${esc(o.why)}</span></div>`).join("") + `</div>`);
-      $("cad-say").querySelectorAll("[data-opt]").forEach((b) => (b.onclick = async () => {
-        remember(); CAD().restore(base); CAD().apply(res.options[+b.dataset.opt].actions);
-        const keep = $("cad-say").innerHTML.split('<div class="ok-line">')[0].split('<div class="warn-line">')[0];
-        sayHTML(keep); await critic();
-      }));
-      return;
-    }
-    if (res.actions?.length) { remember(); CAD().apply(res.actions); }
-    sayHTML(`<div>${esc(res.say || (res.actions?.length ? "Done." : "I couldn't turn that into furniture changes."))}</div>`);
-    if (res.actions?.length) await critic();
-  } catch (err) { sayHTML(`<div class="note">Couldn't do that: ${esc(err.message)}</div>`); }
+    const actions = res.actions?.length ? res.actions : res.options?.[0]?.actions || [];   // one layout at a time
+    let notes = [];
+    if (actions.length) { remember(); notes = CAD().apply(actions); }
+    agentLog.push(`user: ${text} -> you: ${res.say || "(no reply)"} [${actions.map((a) => `${a.op} ${a.label || a.target}${a.wall != null ? ` wall ${a.wall}` : ""}`).join(", ")}]`);
+    sayHTML(`<div>${esc(res.say || (actions.length ? "Done." : "I couldn't turn that into furniture changes."))}</div>${notesHTML(notes)}`);
+    if (actions.length) await critic(true);
+  } catch (err) { sayHTML(`<div class="note">Couldn't do that: ${esc(err.message)}. Try again or rephrase.</div>`); }
+  finally { btn.disabled = false; }
 };
 </script>
 </body>

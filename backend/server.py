@@ -237,6 +237,78 @@ def query(q: Query):
     return JSONResponse(out)
 
 
+class Spot(BaseModel):
+    model_id: str
+    room_label: str
+    w_ft: float = Field(gt=0)
+    d_ft: float = Field(gt=0)
+    center_px: list[float] = Field(min_length=2, max_length=2)
+    rotation_deg: float = 0
+    clearance_ft: float | None = Field(default=BED_CLEARANCE_FT, ge=0)
+
+
+WALL_TOUCH_FT = 0.5  # a side closer than this to a wall counts as "against the wall", not a walkway
+
+
+@app.post("/check_placement")
+def check_placement(q: Spot):
+    """A spot chosen by hand (dragged / rotated in the UI): w×d rect, w along x at 0°, rotated about
+    center_px. Inside the room? Out of door swings? Walkway on each open side? Way out still clear?"""
+    model = _get_model(q.model_id)
+    if model is None:
+        return JSONResponse({"error": f"unknown model_id {q.model_id}"}, status_code=404)
+    scale = model["scale_px_per_ft"]
+    out = {"room": None, "label": None, "fit": None, "clear_path": None, "errors": [], "timings_ms": {}}
+    if not scale:
+        out["fit"] = {"fits": None, "verdict": "unknown", "placement": None, "reason": solvers.NO_SCALE}
+        return JSONResponse(out)
+    clearance = BED_CLEARANCE_FT if q.clearance_ft is None else q.clearance_ft
+    cx, cy = q.center_px
+    a = math.radians(q.rotation_deg)
+    u, v = (math.cos(a), math.sin(a)), (-math.sin(a), math.cos(a))
+    hw, hd = q.w_ft * scale / 2, q.d_ft * scale / 2
+    poly = [[round(cx + sx * hw * u[0] + sy * hd * v[0], 1), round(cy + sx * hw * u[1] + sy * hd * v[1], 1)]
+            for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    # the room it's in now (it may have been dragged into the next room), else the one asked about
+    from shapely.geometry import Point
+    room = next((r for r in model["rooms"] if solvers._poly(r).contains(Point(cx, cy))), None) \
+        or _find_room(model["rooms"], q.room_label)
+    if room is None:
+        out["errors"].append({"stage": "room", "error": f"no room matching {q.room_label!r}"})
+        return JSONResponse(out)
+    out["room"], out["label"] = room["id"], room.get("label")
+    spot = _run(out, "fit", solvers.check_spot, room, poly, model["doors"], scale) or {}
+    base = _run(out, "clear_path", solvers.clear_path, model["rooms"], model["doors"], model["entrance"], scale) or []
+    res = _run(out, "clear_path", _path_with, model, poly, base)
+    paths, blocks = res if res else (None, [])
+    sides = spot.get("sides") or []
+    open_ = [s for s in sides if s["gap_ft"] >= WALL_TOUCH_FT]
+    tight = [s for s in open_ if s["gap_ft"] < clearance]
+    name = room.get("label") or room["id"]
+    if spot.get("inside") is False:
+        verdict, fits, reason = "no_fit", False, f"It sticks out of {name}'s walls here."
+    elif spot.get("door_blocked"):
+        verdict, fits, reason = "no_fit", False, "It's in a door's swing here: the door can't open fully."
+    elif blocks:
+        verdict, fits, reason = "blocks_path", True, f"It blocks the way from {', '.join(sorted(set(blocks)))} to the entrance here."
+    elif tight:
+        verdict, fits = "tight", False
+        reason = ("Fits here, but the walkway is only " +
+                  ", ".join(f"{s['gap_ft']:g} ft on the {s['side']}" for s in tight) + f" (you asked for {clearance:g} ft).")
+    else:
+        verdict, fits = "fits", True
+        reason = f"Fits here with at least {clearance:g} ft of walkway on every open side."
+    walls = [s["side"] for s in sides if s["gap_ft"] < WALL_TOUCH_FT]
+    if spot.get("inside") and walls and verdict != "no_fit":
+        reason += f" Against the wall on the {', '.join(walls)}."
+    rot = round(q.rotation_deg % 360, 1)
+    out["fit"] = {"fits": fits, "verdict": verdict, "reason": reason, "placement": poly, "center_px": [cx, cy],
+                  "rotation_deg": rot, "manual": True, "sides": sides, "walkway_ft": min((s["gap_ft"] for s in open_), default=None),
+                  "requested_walkway_ft": clearance, "door_blocked": spot.get("door_blocked"), "inside": spot.get("inside")}
+    out["clear_path"] = _path_summary(paths if paths is not None else base)
+    return JSONResponse(_jsonable(out))
+
+
 @app.post("/voice")
 def voice(model_id: str = Form(...), audio: UploadFile = File(...)):
     """Spoken question -> Hydrogen JSON intent -> presets/defaults -> same fit + path as /query."""
@@ -364,6 +436,7 @@ class AgentIn(BaseModel):
     furniture: list[dict] = []
     image_b64: str | None = Field(default=None, max_length=4_000_000)   # JPEG screenshot of the 3D view
     issues: list[str] = []                                              # checker findings -> agent suggests fixes
+    history: list[str] = []                                             # recent "request -> reply" lines (memory)
 
 
 @app.post("/cad_agent")
@@ -371,7 +444,8 @@ def cad_agent(q: AgentIn):
     """Plain-English furniture request -> placement actions for the CAD view (agent.py; model picks walls, never coordinates)."""
     # cache identical requests (same words, room, furniture, problems; NOT the screenshot) so rehearsed demo
     # commands replay instantly; anything new goes live to Gemini. Invalidated by any backend code change.
-    akey = hashlib.sha256(json.dumps([q.text.strip().lower(), q.walls, q.furniture, q.issues], sort_keys=True).encode()).hexdigest()[:24]
+    akey = hashlib.sha256(json.dumps([q.text.strip().lower(), q.walls, q.furniture, q.issues, q.history[-6:]],
+                                     sort_keys=True).encode()).hexdigest()[:24]
     apath = os.path.join(MODEL_DIR, f"agent_{akey}_{PIPELINE_VERSION}.json")
     try:
         with open(apath) as f:
@@ -381,8 +455,8 @@ def cad_agent(q: AgentIn):
         pass
     try:
         import agent  # lazy: a missing / mid-edit agent.py never breaks the server
-        out = _jsonable(agent.plan_actions(_genai(), q.text, q.walls, q.furniture, q.image_b64, q.issues))
-        if out.get("actions") or out.get("options") or out.get("suggestions"):
+        out = _jsonable(agent.plan_actions(_genai(), q.text, q.walls, q.furniture, q.image_b64, q.issues, q.history))
+        if out.get("actions") or out.get("suggestions"):
             try:
                 os.makedirs(MODEL_DIR, exist_ok=True)
                 with open(apath, "w") as f:
@@ -644,7 +718,8 @@ def _size_text(room):
 
 
 def _fit_and_path(model, w_ft, d_ft, clearance_ft, room_label):
-    """Shared by /query and /voice: fit in the matched room, then clear_path with the object placed."""
+    """Shared by /query and /voice: the best spot for the object in the matched room (_best_spot), then
+    clear_path with it placed."""
     out = {"room": None, "label": None, "fit": None, "clear_path": None, "errors": [], "timings_ms": {}}
     room = _find_room(model["rooms"], room_label)
     if room is None:
@@ -652,13 +727,91 @@ def _fit_and_path(model, w_ft, d_ft, clearance_ft, room_label):
         out["errors"].append({"stage": "room", "error": f"no room matching {room_label!r}; rooms: {labels}"})
         return out
     out["room"], out["label"] = room["id"], room.get("label")
-    scale, doors = model["scale_px_per_ft"], model["doors"]
-    out["fit"] = _with_pose(_run(out, "fit", solvers.fit, room, w_ft, d_ft, clearance_ft, doors, scale), w_ft, d_ft, scale)
-    placed = (out["fit"] or {}).get("placement")
-    paths = _run(out, "clear_path", solvers.clear_path, model["rooms"], doors, model["entrance"], scale,
-                 [placed] if placed else None)
-    out["clear_path"] = _path_summary(paths) if paths is not None else None
+    base = _run(out, "clear_path", solvers.clear_path, model["rooms"], model["doors"], model["entrance"],
+                model["scale_px_per_ft"])
+    res = _run(out, "fit", _best_spot, model, room, w_ft, d_ft, clearance_ft, base or [])
+    if res is not None:
+        out["fit"], paths = res
+        paths = paths if paths is not None else base
+        out["clear_path"] = _path_summary(paths) if paths is not None else None
     return out
+
+
+FIT_MAX_SPOTS = 40       # distinct spots (all 8 orientations) checked for the way out
+FIT_SHOW_SPOTS = 12      # alternatives handed to the UI ("next spot")
+FIT_PATH_BUDGET_S = 4.0  # stop path-checking spots after this once a good one is found
+
+
+def _path_with(model, placement, base):
+    """clear_path with the object placed. blocks = names of bedrooms that reached the entrance before
+    (base) and can't now: an already-blocked plan is never blamed on the furniture."""
+    paths = solvers.clear_path(model["rooms"], model["doors"], model["entrance"], model["scale_px_per_ft"],
+                               [placement] if placement else None)
+    before = {p["from"]: p["ok"] for p in base}
+    names = {r["id"]: r.get("label") or r["id"] for r in model["rooms"]}
+    return paths, [names.get(p["from"], p["from"]) for p in paths if p["ok"] is False and before.get(p["from"]) is True]
+
+
+def _best_spot(model, room, w_ft, d_ft, clearance_ft, base):
+    """Every distinct spot over all 8 orientations (solvers.fit_candidates), each path-checked; pick the
+    best that keeps every bedroom's way out clear. Nothing fits with the walkway asked for -> the widest
+    walkway (0.25 ft steps) that does fit, as verdict "tight". Returns (fit, paths of the picked spot).
+    verdict: fits | blocks_path | tight | no_fit | unknown. Never a made-up spot: no fit -> no placement."""
+    scale, doors = model["scale_px_per_ft"], model["doors"]
+    plain = solvers.fit(room, w_ft, d_ft, clearance_ft, doors, scale)   # no-scale handling + the "needs" text
+    if plain["fits"] is None:
+        return {**plain, "verdict": "unknown", "spots": []}, None
+    walk, cands = clearance_ft, solvers.fit_candidates(room, w_ft, d_ft, clearance_ft, doors, scale, FIT_MAX_SPOTS)
+    while not cands and walk > 0:
+        walk = max(0.0, round(walk - 0.25, 2))
+        cands = solvers.fit_candidates(room, w_ft, d_ft, walk, doors, scale, FIT_MAX_SPOTS)
+    tried = plain.get("orientations_tried")
+    if not cands:   # fits nowhere, even with no walkway: show where it misses by least (red), never call it a fit
+        need = re.sub(r"^tried \d+ orientations: | \([\d.]+ × [\d.]+ ft \+ [\d.]+ ft clearance on 3 sides\)", "", plain["reason"])
+        why = f"Doesn't fit: {need}" + ("" if clearance_ft == 0 else "; not even with no walkway")
+        near = solvers.closest_spot(room, w_ft, d_ft, doors, scale)
+        out = {**plain, "verdict": "no_fit", "reason": why, "spots": [], "walkway_ft": None,
+               "requested_walkway_ft": clearance_ft, "closest": bool(near)}
+        if near:
+            pose = _with_pose({"placement": near["placement"]}, w_ft, d_ft, scale)
+            over = near["overflow_sqft"]
+            out.update(placement=near["placement"], center_px=pose["center_px"], rotation_deg=pose["rotation_deg"],
+                       overflow_sqft=over)
+            out["reason"] += (f". Shown where it misses by least: {over:g} sq ft pokes through the walls" if over > 0
+                              else ". Shown where it misses by least: it's inside the walls but in a door's swing")
+        return out, None
+    t0, spots = time.perf_counter(), []
+    for c in cands:
+        paths, blocks = _path_with(model, c["placement"], base)
+        spots.append({**_with_pose(c, w_ft, d_ft, scale), "blocks": blocks, "paths": paths})
+        if time.perf_counter() - t0 > FIT_PATH_BUDGET_S and any(not s["blocks"] for s in spots):
+            break
+    good = [s for s in spots if not s["blocks"]]
+    pick = (good or spots)[0]
+    side = f" (turned sideways: its {d_ft:g} ft side along the wall)" if pick["orientation"] == "sideways" else ""
+    where = "against a wall" if pick["against_wall"] else "free-standing (no spot against a wall works)"
+    skipped = len(spots) - len(good)
+    if walk < clearance_ft:
+        verdict, fits = "tight", False
+        need = re.sub(r"^tried \d+ orientations: | \([\d.]+ × [\d.]+ ft \+ [\d.]+ ft clearance on 3 sides\)", "", plain["reason"])
+        reason = f"Not with a {clearance_ft:g} ft walkway: {need}. Closest fit: {where}{side}, leaving {walk:g} ft of walkway."
+    elif not good:
+        verdict, fits = "blocks_path", True
+        reason = (f"Fits {where}{side}, but every one of the {len(spots)} spots that fit blocks the way from "
+                  f"{', '.join(sorted(set(pick['blocks'])))} to the entrance.")
+    else:
+        verdict, fits = "fits", True
+        reason = (f"Fits {where} with {clearance_ft:g} ft walkway on 3 sides{side}." if clearance_ft > 0
+                  else f"Fits {where}{side} (no walkway asked for).")
+    if good and verdict != "blocks_path":
+        reason += f" {len(good)} spot{'s work' if len(good) != 1 else ' works'} (tried {tried} orientations)"
+        reason += f"; skipped {skipped} that would block the way to the entrance." if skipped else "."
+    show = (good + [s for s in spots if s["blocks"]])[:FIT_SHOW_SPOTS]
+    keep = ("placement", "center_px", "rotation_deg", "orientation", "against_wall", "blocks")
+    fit = {"fits": fits, "verdict": verdict, "reason": reason, "walkway_ft": walk, "requested_walkway_ft": clearance_ft,
+           "orientations_tried": tried, "spots_tried": len(spots), "spots_clear": len(good),
+           **{k: pick[k] for k in keep}, "spots": [{k: s[k] for k in keep} for s in show]}
+    return fit, pick["paths"]
 
 
 def _with_pose(fit, w_ft, d_ft, scale):

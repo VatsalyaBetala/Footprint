@@ -8,7 +8,7 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 
 const WALL_T = 0.35, DOOR_H = 6.67, SILL = 3, HEAD = 7, SNAP = 0.1;
 let R, L, scene, cam, ctl, el, hud;
-let poly = [], H = 8.5, pieces = [], sel = null, drag = null, liveDims = null, built = null, wallInfo = [], doorZones = [];
+let poly = [], H = 8.5, pieces = [], sel = null, drag = null, liveDims = null, built = null, wallInfo = [], doorZones = [], doorSpans = [];
 function dispose(obj) {        // remove from the scene AND drop its HTML labels (CSS2D elements outlive their objects)
   if (!obj) return; obj.traverse((o) => o.element?.remove()); obj.parent?.remove(obj);
 }
@@ -45,18 +45,24 @@ function show(model, fit) {
   const toW = ([x, y]) => [x / s - c[0], y / s - c[1]];
   poly = raw.map(([x, y]) => [x - c[0], y - c[1]]);
   H = model.scan?.ceiling_ft?.best || 8.5;
-  scene = new THREE.Scene(); scene.background = new THREE.Color(0xf6f7f9);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa3ad, 1.7));
+  scene = new THREE.Scene(); scene.background = new THREE.Color(0xf7f5ef);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xa69e8f, 1.7));
   const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(12, 25, 8); sun.castShadow = true; scene.add(sun);
   L.domElement.replaceChildren(); pieces = []; sel = null; liveDims = null;
   floor(); walls(model, toW); dimensions();
-  (model.furniture || []).forEach((f) => { const pts = (f.polygon || []).map(toW); if (pts.length >= 3) addPiece(f.label, pts, f.h_ft || 2.5, "found"); });
+  (model.furniture || []).forEach((f) => { const pts = (f.polygon || []).map(toW); if (pts.length >= 3) tuck(addPiece(f.label, pts, f.h_ft || 2.5, "found")); });
+  baseIssues = new Set(check());   // what the video itself shows (chairs under a table, scan slop): not the user's problem
   const span = Math.max(...poly.map(([x, z]) => Math.hypot(x, z))) * 2 + 4;
   cam.position.set(span * 0.55, span * 0.75, span * 0.75); ctl.target.set(0, 1, 0); ctl.update();
   status(null); built = model; toWorld = toW; fitPiece = null; fitKey = undefined;
   setFit(fit);
 }
-let toWorld = null, fitPiece = null, fitKey, hoverPiece = null, wallGroups = [], curGroup = null;
+let toWorld = null, fitPiece = null, fitKey, hoverPiece = null, wallGroups = [], curGroup = null, baseIssues = new Set();
+function tuck(m) {   // furniture seen in the video that pokes through a wall (scan slop): slide it back inside the room's box
+  const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]), [x0, x1, z0, z1] = footprint(m);
+  if (x1 - x0 < Math.max(...xs) - Math.min(...xs)) m.position.x += Math.max(0, Math.min(...xs) + 0.02 - x0) - Math.max(0, x1 - Math.max(...xs) + 0.02);
+  if (z1 - z0 < Math.max(...zs) - Math.min(...zs)) m.position.z += Math.max(0, Math.min(...zs) + 0.02 - z0) - Math.max(0, z1 - Math.max(...zs) + 0.02);
+}
 function setFit(fit) {   // the solver's placement from "Will it fit?" as a draggable piece; replaced, never duplicated
   const key = fit?.poly ? JSON.stringify(fit.poly) + fit.fits : null;
   if (key === fitKey) return; fitKey = key;
@@ -86,7 +92,7 @@ function edges() {   // [{a, b, u (unit along), n (inward normal), len}]
 
 function walls(model, toW) {
   const E = edges();
-  wallInfo = E.map((e, i) => ({ id: i, length_ft: +e.len.toFixed(1), door: false, window: false })); doorZones = []; wallGroups = [];
+  wallInfo = E.map((e, i) => ({ id: i, length_ft: +e.len.toFixed(1), door: false, window: false })); doorZones = []; wallGroups = []; doorSpans = E.map(() => []);
   const openings = [...(model.doors || []).map((d) => ({ ...d, kind: "door", w: d.width_ft || 2.67 })),
                     ...(model.windows || []).map((w) => ({ ...w, kind: "window", w: w.width_ft || 3 }))];
   E.forEach((e, i) => {
@@ -103,7 +109,7 @@ function walls(model, toW) {
     let t = 0;
     for (const o of ops) {
       if (o.t0 > t) wallPiece(e, t, o.t0, 0, H);
-      if (o.kind === "door") { wallPiece(e, o.t0, o.t1, Math.min(DOOR_H, H - 0.2), H); doorSwing(e, o); }
+      if (o.kind === "door") { wallPiece(e, o.t0, o.t1, Math.min(DOOR_H, H - 0.2), H); doorSwing(e, o); doorSpans[i].push([o.t0, o.t1]); }
       else { wallPiece(e, o.t0, o.t1, 0, SILL); wallPiece(e, o.t0, o.t1, Math.min(HEAD, H - 0.3), H); glass(e, o); }
       t = Math.max(t, o.t1);
     }
@@ -118,24 +124,27 @@ function wallPiece(e, t0, t1, y0, y1) {
   m.position.set(e.a[0] + e.u[0] * mid - e.n[0] * WALL_T / 2, (y0 + y1) / 2, e.a[1] + e.u[1] * mid - e.n[1] * WALL_T / 2);
   m.rotation.y = -Math.atan2(e.u[1], e.u[0]); m.receiveShadow = true;
   (curGroup || scene).add(m);
-  const ed = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x334155 }));
+  const ed = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x3a3833 }));
   ed.position.copy(m.position); ed.rotation.copy(m.rotation); (curGroup || scene).add(ed);
 }
-function doorSwing(e, o) {
-  const r = o.t1 - o.t0, hinge = [e.a[0] + e.u[0] * o.t0, e.a[1] + e.u[1] * o.t0], pts = [];
-  const zx = [hinge[0], hinge[0] + e.u[0] * r, hinge[0] + e.n[0] * r, hinge[0] + e.u[0] * r + e.n[0] * r];
-  const zz = [hinge[1], hinge[1] + e.u[1] * r, hinge[1] + e.n[1] * r, hinge[1] + e.u[1] * r + e.n[1] * r];
-  doorZones.push([Math.min(...zx), Math.max(...zx), Math.min(...zz), Math.max(...zz)]);   // square the door sweeps through
-  for (let k = 0; k <= 16; k++) { const t = (k / 16) * Math.PI / 2;
-    pts.push(new THREE.Vector3(hinge[0] + r * (Math.cos(t) * e.u[0] + Math.sin(t) * e.n[0]), 0.02, hinge[1] + r * (Math.cos(t) * e.u[1] + Math.sin(t) * e.n[1]))); }
-  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: 0x2563eb })));
-  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(hinge[0], 0.02, hinge[1]),
-    new THREE.Vector3(hinge[0] + r * e.n[0], 0.02, hinge[1] + r * e.n[1])]), new THREE.LineBasicMaterial({ color: 0x2563eb })));
-  label(`door ${r.toFixed(1)} ft`, [hinge[0] + e.u[0] * r / 2, DOOR_H + 0.4, hinge[1] + e.u[1] * r / 2], "tag");
+function doorSwing(e, o) {   // one leaf; a door wider than 4 ft is drawn as a double door (two leaves of half the width)
+  const span = o.t1 - o.t0, leaves = span > 4 ? [[o.t0, 1], [o.t1, -1]] : [[o.t0, 1]], r = span / leaves.length;
+  for (const [t, dir] of leaves) {
+    const hinge = [e.a[0] + e.u[0] * t, e.a[1] + e.u[1] * t], u = [e.u[0] * dir, e.u[1] * dir], pts = [];
+    const zx = [hinge[0], hinge[0] + u[0] * r, hinge[0] + e.n[0] * r, hinge[0] + u[0] * r + e.n[0] * r];
+    const zz = [hinge[1], hinge[1] + u[1] * r, hinge[1] + e.n[1] * r, hinge[1] + u[1] * r + e.n[1] * r];
+    doorZones.push([Math.min(...zx), Math.max(...zx), Math.min(...zz), Math.max(...zz)]);   // square the leaf sweeps through
+    for (let k = 0; k <= 16; k++) { const a = (k / 16) * Math.PI / 2;
+      pts.push(new THREE.Vector3(hinge[0] + r * (Math.cos(a) * u[0] + Math.sin(a) * e.n[0]), 0.02, hinge[1] + r * (Math.cos(a) * u[1] + Math.sin(a) * e.n[1]))); }
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: 0x27466b })));
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(hinge[0], 0.02, hinge[1]),
+      new THREE.Vector3(hinge[0] + r * e.n[0], 0.02, hinge[1] + r * e.n[1])]), new THREE.LineBasicMaterial({ color: 0x27466b })));
+  }
+  label(`${leaves.length > 1 ? "double door" : "door"} ${span.toFixed(1)} ft`, [e.a[0] + e.u[0] * (o.t0 + o.t1) / 2, DOOR_H + 0.4, e.a[1] + e.u[1] * (o.t0 + o.t1) / 2], "tag");
 }
 function glass(e, o) {
   const len = o.t1 - o.t0, mid = (o.t0 + o.t1) / 2, top = Math.min(HEAD, H - 0.3);
-  const g = new THREE.Mesh(new THREE.BoxGeometry(len, top - SILL, 0.06), new THREE.MeshStandardMaterial({ color: 0x9cc9f5, transparent: true, opacity: 0.45 }));
+  const g = new THREE.Mesh(new THREE.BoxGeometry(len, top - SILL, 0.06), new THREE.MeshStandardMaterial({ color: 0xa9bccd, transparent: true, opacity: 0.45 }));
   g.position.set(e.a[0] + e.u[0] * mid - e.n[0] * WALL_T / 2, (SILL + top) / 2, e.a[1] + e.u[1] * mid - e.n[1] * WALL_T / 2);
   g.rotation.y = -Math.atan2(e.u[1], e.u[0]); (curGroup || scene).add(g);
   label(`window ${len.toFixed(1)} ft`, [g.position.x + e.n[0] * 0.4, top + 0.4, g.position.z + e.n[1] * 0.4], "tag");
@@ -146,7 +155,7 @@ function dimLine(p0, p1, text, cls = "dim", parent = scene) {
   const grp = new THREE.Group(), v0 = new THREE.Vector3(...p0), v1 = new THREE.Vector3(...p1);
   const dir = v1.clone().sub(v0).normalize(), up = Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
   const tick = new THREE.Vector3().crossVectors(dir, up).normalize().multiplyScalar(0.18);
-  const color = cls === "bad" ? 0xdc2626 : cls === "ok" ? 0x059669 : 0x1d4ed8;
+  const color = cls === "bad" ? 0xa8432f : cls === "ok" ? 0x3f7355 : 0x1e3858;
   const pts = [v0, v1, v0.clone().add(tick), v0.clone().sub(tick), v1.clone().add(tick), v1.clone().sub(tick)];
   const geo = new THREE.BufferGeometry().setFromPoints(pts); geo.setIndex([0, 1, 2, 3, 4, 5]);
   grp.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color, depthTest: false })));
@@ -167,15 +176,16 @@ function dimensions() {
 }
 
 // ---------- furniture ----------
-const COLORS = { bed: 0x9db4d8, sofa: 0x9fc29a, desk: 0xc9a77c, table: 0xc9a77c, chair: 0x7f8ea3, found: 0xcfc6b8, fit: 0x34d399, nofit: 0xf87171 };
+const COLORS = { bed: 0xa9b6c6, sofa: 0xa9b89a, desk: 0xc9a77c, table: 0xc9a77c, chair: 0x8a8478, found: 0xcfc6b8, fit: 0x6f9a7e, nofit: 0xc4705f };
 function colorFor(label, kind) { const k = Object.keys(COLORS).find((c) => label.toLowerCase().includes(c)); return COLORS[kind === "found" ? (k || "found") : kind] ?? COLORS[k] ?? COLORS.found; }
 function addPiece(labelText, pts, h, kind) {
+  labelText = String(labelText || "item").replace(/_/g, " ");      // scan labels come as "bar_stool_1"
   const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
   const w = Math.max(...xs) - Math.min(...xs), d = Math.max(...zs) - Math.min(...zs);
   const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: colorFor(labelText, kind), roughness: 0.7 }));
   m.scale.set(w, h, d); m.position.set((Math.max(...xs) + Math.min(...xs)) / 2, h / 2, (Math.max(...zs) + Math.min(...zs)) / 2);
   m.castShadow = true; m.userData = { label: labelText, w, d, h };
-  const ed = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0x334155 }));
+  const ed = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0x3a3833 }));
   m.add(ed); m.userData.edges = ed;
   m.userData.tag = label(`${labelText} ${w.toFixed(1)}×${d.toFixed(1)}`, [0, 0.5 + 0.35 / h, 0], "piece", m);
   m.userData.tag.visible = false;            // shown only when selected / hovered: no pile-up of labels
@@ -221,13 +231,13 @@ function update(m) {
   const { label: name, w, d } = m.userData, tight = gaps.filter((g) => g < 2).length;
   const state = out ? ["bad", "outside the room"] : overlap ? ["bad", `overlaps ${overlap.userData.label}`]
               : tight > 1 ? ["warn", "fits, but less than 2 ft of walkway on " + tight + " sides"] : ["ok", "fits with walkway space"];
-  m.material.emissive?.set(state[0] === "bad" ? 0x7f1d1d : 0x000000);
+  m.material.emissive?.set(state[0] === "bad" ? 0x7d2f21 : 0x000000);
   status(`${name} · ${w.toFixed(1)} × ${d.toFixed(1)} ft — ${state[1]}`, state[0]);
 }
 function select(m) {
-  if (sel) { sel.userData.edges.material.color.set(0x334155); sel.userData.tag.visible = false; }
+  if (sel) { sel.userData.edges.material.color.set(0x3a3833); sel.userData.tag.visible = false; }
   sel = m; if (!m) { dispose(liveDims); liveDims = null; return status(null); }
-  m.userData.edges.material.color.set(0x2563eb); m.userData.tag.visible = true; update(m);
+  m.userData.edges.material.color.set(0x27466b); m.userData.tag.visible = true; update(m);
 }
 function status(text, cls) {
   hud.className = `cad-hud ${cls || ""}`;
@@ -266,25 +276,84 @@ function onDbl(ev) {
 }
 
 // ---------- agent actions (from POST /cad_agent: wall + position + gap, never coordinates) ----------
+// The agent picks walls; everything here is deterministic. settle() then moves any piece that would overlap
+// another piece, a door swing or the walls to the nearest free spot (same wall first), so nothing is stacked.
 function setTag(m) { m.userData.tag.element.textContent = `${m.userData.label} ${m.userData.w.toFixed(1)}×${m.userData.d.toFixed(1)}`; }
+function wallSlot(e, t, gap, along, depth) {   // centre + x/z extents of a piece on wall e, centred t ft from its start
+  const alongX = Math.abs(e.u[0]) > 0.7, n = Math.max(0, gap || 0) + depth / 2 + 0.02;
+  return { x: e.a[0] + e.u[0] * t + e.n[0] * n, z: e.a[1] + e.u[1] * t + e.n[1] * n, w: alongX ? along : depth, d: alongX ? depth : along };
+}
+function put(m, s) { m.position.x = s.x; m.position.z = s.z; m.userData.w = s.w; m.userData.d = s.d; m.scale.set(s.w, m.scale.y, s.d); setTag(m); }
 function placeOnWall(m, wallId, position, gap, along, depth) {
   const e = edges()[wallId];
   if (!e) { m.position.x = 0; m.position.z = 0; return; }                 // unknown wall: middle of the room
-  const alongX = Math.abs(e.u[0]) > 0.7, sx = alongX ? along : depth, sz = alongX ? depth : along;
-  m.userData.w = sx; m.userData.d = sz; m.scale.set(sx, m.scale.y, sz);
   const a = Math.min(along, e.len);
   const t = position === "start" ? a / 2 + 0.1 : position === "end" ? e.len - a / 2 - 0.1 : e.len / 2;
-  const n = Math.max(0, gap || 0) + depth / 2 + 0.02;
-  m.position.x = e.a[0] + e.u[0] * t + e.n[0] * n; m.position.z = e.a[1] + e.u[1] * t + e.n[1] * n;
-  setTag(m);
+  put(m, wallSlot(e, t, gap, along, depth));
+}
+function alongDepth(m, e) { const ax = Math.abs(e.u[0]) > 0.7; return ax ? [m.userData.w, m.userData.d] : [m.userData.d, m.userData.w]; }
+function wallOf(m) {   // the wall a piece stands by: {wall, t (centre, ft from the wall's start), gap, along, depth}
+  let best = null;
+  edges().forEach((e, i) => {
+    const [along, depth] = alongDepth(m, e), px = m.position.x - e.a[0], pz = m.position.z - e.a[1];
+    const t = px * e.u[0] + pz * e.u[1], gap = px * e.n[0] + pz * e.n[1] - depth / 2;
+    if (t < -along / 2 || t > e.len + along / 2) return;
+    if (!best || gap < best.gap) best = { wall: i, t, gap: Math.max(0, gap), along, depth };
+  });
+  return best;
+}
+const EPS = 0.05;
+function hits(a, b) { return a[0] < b[1] - EPS && a[1] > b[0] + EPS && a[2] < b[3] - EPS && a[3] > b[2] + EPS; }
+function blocker(m, x, z, w, d, ignore) {   // what stops m standing here (a name), or null = free
+  const r = [x - w / 2, x + w / 2, z - d / 2, z + d / 2];
+  if (![[r[0], r[2]], [r[1], r[2]], [r[1], r[3]], [r[0], r[3]], [x, z]].every(inside)) return "the walls";
+  if (doorZones.some((dz) => hits(r, dz))) return "the door swing";
+  const p = pieces.find((p) => p !== m && !ignore?.has(p) && hits(r, footprint(p)));
+  return p ? p.userData.label : null;
+}
+function settle(m, want, ignore) {   // nearest free spot for m: same wall, then other walls, then turned, then open floor
+  const { w, d } = m.userData, x0 = m.position.x, z0 = m.position.z, name = m.userData.label;
+  const why = blocker(m, x0, z0, w, d, ignore);
+  if (!why) return null;
+  const cands = [], free = want.wall == null;
+  edges().forEach((e, i) => {
+    for (const turned of [false, true]) {
+      let [along, depth] = alongDepth(m, e); if (turned) [along, depth] = [depth, along];
+      if (along > e.len - 0.2) continue;
+      for (let t = along / 2 + 0.1; t <= e.len - along / 2 - 0.1 + 1e-9; t += 0.25) {
+        const s = wallSlot(e, t, i === want.wall ? want.gap : 0, along, depth);
+        cands.push({ ...s, wall: i, turned, cost: (free ? 1000 : i === want.wall ? 0 : 1000) + (turned ? 2000 : 0) + Math.hypot(s.x - x0, s.z - z0) });
+      }
+    }
+  });
+  const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]);
+  for (let x = Math.min(...xs) + w / 2 + 0.1; x <= Math.max(...xs) - w / 2 - 0.1; x += 0.25)
+    for (let z = Math.min(...zs) + d / 2 + 0.1; z <= Math.max(...zs) - d / 2 - 0.1; z += 0.25)
+      cands.push({ x, z, w, d, wall: null, turned: false, cost: (free ? 0 : 5000) + Math.hypot(x - x0, z - z0) });
+  cands.sort((a, b) => a.cost - b.cost);
+  const c = cands.find((c) => !blocker(m, c.x, c.z, c.w, c.d, ignore));
+  if (!c) return `no free spot is big enough for ${name} (it overlaps ${why}): try a smaller size or remove something`;
+  put(m, c);
+  const dist = Math.hypot(c.x - x0, c.z - z0).toFixed(1);
+  return c.wall != null && c.wall === want.wall && !c.turned ? `slid ${name} ${dist} ft along wall ${c.wall} to clear ${why}`
+       : c.wall == null ? `put ${name} ${dist} ft away in open floor to clear ${why}`
+       : `put ${name} on wall ${c.wall}${c.turned ? ", turned" : ""} to clear ${why}`;
 }
 function find(name) {
   const q = String(name || "").toLowerCase().trim(); if (!q) return null;
   return pieces.find((p) => p.userData.label.toLowerCase() === q)
       || pieces.find((p) => p.userData.label.toLowerCase().includes(q) || q.includes(p.userData.label.toLowerCase())) || null;
 }
-function apply(actions) {
-  if (!scene) return null;
+function nextTo(m, ref, wallId) {   // put m beside ref on ref's wall (or wallId), on whichever side is free
+  const o = wallOf(ref), e = edges()[wallId ?? o?.wall]; if (!o || !e) return wallId ?? null;
+  const [along, depth] = alongDepth(m, e), w = wallId ?? o.wall, refT = (ref.position.x - e.a[0]) * e.u[0] + (ref.position.z - e.a[1]) * e.u[1];
+  const [rAlong] = alongDepth(ref, e), slots = [1, -1].map((sg) => wallSlot(e, refT + sg * (rAlong / 2 + along / 2 + 0.1), 0, along, depth));
+  put(m, slots.find((s) => !blocker(m, s.x, s.z, s.w, s.d)) || slots[0]);
+  return w;
+}
+function apply(actions) {   // returns notes: what had to be adjusted, or couldn't be done
+  if (!scene) return [];
+  const notes = [], want = new Map();
   let last = null;
   for (const a of actions || []) {
     if (a.op === "add") {
@@ -292,20 +361,27 @@ function apply(actions) {
       const m = addPiece(a.label || "item", [[-w / 2, -d / 2], [w / 2, d / 2]], h, "x");
       m.material.color.set(colorFor(a.label || "", "x"));
       if (a.wall != null) placeOnWall(m, a.wall, a.position, a.gap_ft, w, d);
-      last = m; continue;
+      const ref = a.next_to && find(a.next_to);
+      want.set(m, { wall: ref ? nextTo(m, ref, a.wall) : a.wall, gap: a.gap_ft || 0 }); last = m; continue;
     }
-    const m = find(a.target || a.label); if (!m) continue;
-    if (a.op === "remove") { if (sel === m) select(null); pieces.splice(pieces.indexOf(m), 1); dispose(m); continue; }
-    if (a.op === "rotate") { const { w, d } = m.userData; m.userData.w = d; m.userData.d = w; m.scale.set(d, m.scale.y, w); setTag(m); }
+    const m = find(a.target || a.label);
+    if (!m) { notes.push(`couldn't find "${a.target || a.label}" to ${a.op}`); continue; }
+    if (a.op === "remove") { if (sel === m) select(null); pieces.splice(pieces.indexOf(m), 1); dispose(m); want.delete(m); continue; }
+    if (a.op === "rotate") { const { w, d } = m.userData; put(m, { x: m.position.x, z: m.position.z, w: d, d: w });
+      if (!want.has(m)) want.set(m, { wall: wallOf(m)?.wall ?? null, gap: 0 }); }
     if (a.op === "move") {
-      const e = edges()[a.wall], alongX = e ? Math.abs(e.u[0]) > 0.7 : true;   // keep the piece's current orientation
-      if (a.wall != null) placeOnWall(m, a.wall, a.position, a.gap_ft, alongX ? m.userData.w : m.userData.d, alongX ? m.userData.d : m.userData.w);
-      else { m.position.x = 0; m.position.z = 0; }
+      const e = edges()[a.wall], [along, depth] = e ? alongDepth(m, e) : [0, 0];   // keep the piece's current orientation
+      if (a.wall != null) placeOnWall(m, a.wall, a.position, a.gap_ft, along, depth);
+      else if (!a.next_to) { m.position.x = 0; m.position.z = 0; }
+      const ref = a.next_to && find(a.next_to);
+      want.set(m, { wall: ref && ref !== m ? nextTo(m, ref, a.wall) : a.wall ?? null, gap: a.gap_ft || 0 });
     }
     last = m;
   }
-  if (last) select(last);
-  return last;
+  const pending = new Set(want.keys());   // settle in order: earlier pieces are obstacles for later ones
+  for (const [m, w] of want) { pending.delete(m); if (!pieces.includes(m)) continue; const n = settle(m, w, pending); if (n) notes.push(n); }
+  if (last && pieces.includes(last)) select(last);
+  return notes;
 }
 // ---------- checker, snapshots, screenshot (agent support) ----------
 function sideGaps(m) {
@@ -337,17 +413,39 @@ function restore(snap) {
     m.material.color.setHex(s.color);
   }
 }
-function screenshot(maxW = 900) {   // JPEG (base64, no prefix) of the current view, for the agent to look at
+function screenshot(maxW = 640) {   // JPEG (base64, no prefix) of the current view, for the agent to look at
   if (!scene) return null;
   R.render(scene, cam);
   const src = R.domElement, k = Math.min(1, maxW / src.width), c = document.createElement("canvas");
   c.width = Math.max(1, Math.round(src.width * k)); c.height = Math.max(1, Math.round(src.height * k));
   c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
-  return c.toDataURL("image/jpeg", 0.8).split(",")[1];
+  return c.toDataURL("image/jpeg", 0.7).split(",")[1];
 }
-function describe() {
-  return { walls: wallInfo, furniture: pieces.map((p) => ({ label: p.userData.label, w_ft: +p.userData.w.toFixed(1), d_ft: +p.userData.d.toFixed(1) })) };
+function freeSpans(i) {   // stretches of wall i (ft from its start) with no door and nothing standing within 2 ft of it
+  const e = edges()[i], busy = [...(doorSpans[i] || [])];
+  for (const p of pieces) {
+    const [x0, x1, z0, z1] = footprint(p), cs = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([x, z]) => [x - e.a[0], z - e.a[1]]);
+    const ts = cs.map(([x, z]) => x * e.u[0] + z * e.u[1]), ns = cs.map(([x, z]) => x * e.n[0] + z * e.n[1]);
+    if (Math.min(...ns) < 2 && Math.max(...ns) > -0.5) busy.push([Math.min(...ts), Math.max(...ts)]);
+  }
+  busy.sort((a, b) => a[0] - b[0]);
+  const out = []; let t = 0;
+  for (const [b0, b1] of busy) { if (b0 - t >= 1) out.push([+t.toFixed(1), +Math.min(b0, e.len).toFixed(1)]); t = Math.max(t, b1); }
+  if (e.len - t >= 1) out.push([+t.toFixed(1), +e.len.toFixed(1)]);
+  return out;
+}
+function describe() {   // what the agent sees: walls with their free spans, every piece with its wall and position
+  return { walls: wallInfo.map((w, i) => ({ ...w, free: freeSpans(i) })),
+    furniture: pieces.map((p) => { const o = wallOf(p), byWall = o && o.gap < 1.5;
+      return { label: p.userData.label, w_ft: +p.userData.w.toFixed(1), d_ft: +p.userData.d.toFixed(1),
+        wall: byWall ? o.wall : null, along_ft: byWall ? +o.along.toFixed(1) : null, gap_ft: byWall ? +o.gap.toFixed(1) : null,
+        span_ft: byWall ? [+(o.t - o.along / 2).toFixed(1), +(o.t + o.along / 2).toFixed(1)] : null }; }) };
+}
+
+function trial(actions) {   // what a set of actions WOULD do: {issues, notes}; the layout is put back afterwards
+  const snap = snapshot(), notes = apply(actions), issues = check();
+  restore(snap); return { issues, notes };
 }
 
 init();
-window.FootprintCAD = { show, add, apply, describe, check, snapshot, restore, screenshot, built: () => built };
+window.FootprintCAD = { show, add, apply, trial, describe, check, snapshot, restore, screenshot, built: () => built, baseline: () => [...baseIssues] };

@@ -1,0 +1,4 @@
+node_modules/
+out/
+# stills from the user-supplied hotel room clip (license unknown): keep out of the public repo
+public/hotel_*

@@ -17,34 +17,42 @@ from pydantic import BaseModel, field_validator
 
 AGENT_PROMPT = """You arrange furniture in a 3D model of ONE room. Turn the user's request into actions.
 
-Walls (clockwise; "along" runs from the wall's start corner to its end corner):
+Walls (clockwise; positions along a wall are measured in ft from its start corner):
 {walls}
-Furniture already in the room:
+Furniture in the room RIGHT NOW (where each piece stands):
 {furniture}
-
+{history}
 {shot}{issues}
 User request: "{text}"
 
 Return ONLY JSON:
-{{"actions": [ACTION, ...],      // changes to make right now (may be empty)
-  "options": [{{"name": short title, "why": one sentence, "actions": [ACTION, ...]}}],
-        // ONLY if the user asks for other layouts / ideas / arrangements / transformations: 2-3 complete alternatives,
-        // each starting from the CURRENT furniture (move / rotate / remove / add). Otherwise [].
+{{"actions": [ACTION, ...],      // the changes to make now (may be empty)
   "suggestions": [{{"text": one sentence fix, "actions": [ACTION, ...]}}],
-        // ONLY if problems are listed above: up to 3 concrete fixes. Otherwise [].
-  "say": one short, friendly sentence}}
+        // ONLY if problems are listed above: up to 2 fixes, each fixing as many of the problems as it can. Otherwise [].
+  "say": one short, friendly sentence saying what you did}}
 ACTION = {{"op": "add" | "move" | "rotate" | "remove",
-          "target": exact label of an existing piece (for move / rotate / remove) or null,
-          "label": short name for a new piece (for add) or null,
+          "target": exact label of an existing piece (move / rotate / remove) or null,
+          "label": short name for a new piece (add) or null,
           "w_ft": width ALONG the wall, "d_ft": depth OUT from the wall, "h_ft": height  (add only; numbers),
-          "wall": wall id (integer) or null for the middle of the room,
-          "position": "start" | "middle" | "end",
+          "wall": wall id (integer) or null for the open floor,
+          "position": "start" | "middle" | "end"   (where along that wall),
+          "next_to": exact label of an existing piece to stand right beside (same wall), or null,
           "gap_ft": distance from that wall, 0 = against it}}
 
 Rules:
-- Never output coordinates. Choose a wall, a position along it and a gap.
-- "by the window" / "under the window" = the wall that has the window; "by the door" = the wall with the door,
-  at the end of the wall nearest the door is fine but never block the door: if the door is in the middle, use start or end.
+- Never output coordinates. Choose a wall, a position along it (or next_to) and a gap.
+- The furniture list above is the current state: it already includes everything from earlier requests. Leave every piece
+  you weren't asked to change where it is. "it" / "that" means the piece from the most recent request.
+- Never stack pieces: put a piece on a free span of a wall that is at least as long as the piece, and pick the position
+  (start / middle / end) that falls inside that span. If the wall the user named has no room, use the nearest wall that
+  does and say so; only if no wall has room, use the open floor (wall null). Do it rather than refuse.
+  (If a spot is taken anyway, the app slides the piece to the nearest free spot.)
+- If the room already has a piece of the kind asked for (e.g. a bed when asked to "put a queen bed ..."), move / replace
+  that one instead of adding a second, unless the user says "another", "second", "two" or similar.
+- "by the window" / "under the window" = the wall that has the window; "by the door" = the wall with the door, never
+  in front of the door itself. "next to X" / "beside X" = next_to X.
+- If the user asks for another layout / arrangement / ideas: give ONE complete, different arrangement as "actions"
+  (move / rotate the existing pieces; don't add or remove unless asked) and describe it in "say".
 - Sizes when not given (ft, w x d x h): king bed 6.33x6.67x2, queen bed 5x6.67x2, full bed 4.5x6.25x2, twin bed 3.25x6.25x2,
   sofa 7x3x2.8, loveseat 5x3x2.8, armchair 3x3x3, desk 5x2.5x2.5, dining table 5x3x2.5, coffee table 4x2x1.5,
   dresser 5x1.6x2.8, nightstand 1.6x1.4x2, bookshelf 3x1x6, TV stand 5x1.5x2, wardrobe 4x2x6.5, crib 2.5x4.5x3.
@@ -53,7 +61,11 @@ Rules:
 """
 
 HYDROGEN = "gemini-4-hydrogen"   # the fast intent model; this is exactly its job
-TIMEOUT_MS = 45_000        # screenshot + options/suggestions schema: replies take 10–25 s
+TIMEOUT_MS = 30_000        # first try (with the screenshot); low thinking replies in 5–10 s
+RETRY_TIMEOUT_MS = 30_000  # second try, text only
+# default (high) thinking spent ~5k thought tokens = 28–60 s and timed out; "low" answers in 5–7 s (measured Nov 21).
+# The deterministic resolver + tested fixes in cad3d.js catch what a quicker answer gets wrong.
+THINKING = types.ThinkingConfig(thinking_level="low")   # ⚠️ "minimal" is rejected for this model (400)
 log = logging.getLogger("footprint.agent")
 
 
@@ -66,6 +78,7 @@ class Action(BaseModel):
     h_ft: float | None = None
     wall: int | None = None
     position: Literal["start", "middle", "end"] = "middle"
+    next_to: str | None = None
     gap_ft: float = 0.0
 
     @field_validator("op", "position", mode="before")
@@ -86,16 +99,33 @@ class Plan(BaseModel):
     suggestions: list[dict] = []
 
 
+def _spans(spans):
+    return ", ".join(f"{float(a):.1f}-{float(b):.1f}" for a, b in spans if b - a >= 1) or "none"
+
+
 def _describe_walls(walls):
     lines = []
     for w in walls:
         things = [t for t, on in (("door", w.get("door")), ("window", w.get("window"))) if on]
-        lines.append(f"- wall {w.get('id')}: {float(w.get('length_ft', 0)):.1f} ft long" + (f", has the {' and '.join(things)}" if things else ""))
+        free = w.get("free")
+        lines.append(f"- wall {w.get('id')}: {float(w.get('length_ft', 0)):.1f} ft long"
+                     + (f", has the {' and '.join(things)}" if things else "")
+                     + (f"; free spans (ft from start): {_spans(free)}" if free is not None else ""))
     return "\n".join(lines) or "- (unknown)"
 
 
 def _describe_furniture(furniture):
-    return "\n".join(f"- \"{f.get('label')}\" {float(f.get('w_ft', 0)):.1f} x {float(f.get('d_ft', 0)):.1f} ft" for f in furniture) or "- (none)"
+    out = []
+    for f in furniture:
+        line = f"- \"{f.get('label')}\" {float(f.get('w_ft') or 0):.1f} x {float(f.get('d_ft') or 0):.1f} ft"
+        if f.get("wall") is not None and f.get("span_ft"):
+            a, b = f["span_ft"]
+            line += f": against wall {f['wall']}" if not f.get("gap_ft") else f": {float(f['gap_ft']):.1f} ft from wall {f['wall']}"
+            line += f", occupying {float(a):.1f}-{float(b):.1f} ft along it"
+        elif "wall" in f:
+            line += ": in the open floor"
+        out.append(line)
+    return "\n".join(out) or "- (none)"
 
 
 OP_SYN = {"place": "add", "put": "add", "insert": "add", "create": "add", "delete": "remove", "take": "remove",
@@ -125,6 +155,8 @@ def _clean(a):
     a["wall"] = int(w) if w is not None else None
     for k in ("w_ft", "d_ft", "h_ft", "gap_ft"):
         a[k] = _num(a.get(k))
+    nt = a.get("next_to")
+    a["next_to"] = str(nt).strip() or None if isinstance(nt, (str, int, float)) and not isinstance(nt, bool) else None
     a["gap_ft"] = a["gap_ft"] or 0.0
     return a
 
@@ -153,23 +185,32 @@ def _parse(raw):
                     for i, o in enumerate(data.get("options") or []) if isinstance(o, dict)]
     plan.suggestions = [{"text": str(s.get("text") or "Suggested fix"), "actions": [a.model_dump() for a in _actions(s.get("actions"))]}
                         for s in data.get("suggestions") or [] if isinstance(s, dict)]
-    plan.options = [o for o in plan.options if o["actions"]][:3]
-    plan.suggestions = [s for s in plan.suggestions if s["actions"]][:3]
+    plan.options = [o for o in plan.options if o["actions"]][:1]
+    if not plan.actions and plan.options:      # one layout only: an "option" reply becomes the actions
+        plan.actions = _actions(plan.options[0]["actions"])
+        plan.say = plan.say or f"{plan.options[0]['name']}: {plan.options[0]['why']}"
+    plan.options = []
+    plan.suggestions = [s for s in plan.suggestions if s["actions"]][:2]
     return plan
 
 
-def plan_actions(client, text, walls, furniture, image_b64=None, issues=None):
+def plan_actions(client, text, walls, furniture, image_b64=None, issues=None, history=None):
     """One Hydrogen call (+ one retry: without the screenshot, in case the image was the problem). Raises after two failures.
     image_b64: JPEG screenshot of the current 3D view (reference only). issues: problems found by the deterministic checker."""
     issues = [str(i) for i in (issues or [])][:12]
+    history = [str(h)[:300] for h in (history or [])][-6:]
     prompt = AGENT_PROMPT.format(
+        history=("Earlier in this conversation (oldest first):\n" + "\n".join(f"- {h}" for h in history) + "\n") if history else "",
         walls=_describe_walls(walls), furniture=_describe_furniture(furniture), text=text.replace('"', "'")[:500],
         shot="A screenshot of the current 3D view is attached for reference (blue labels = wall lengths).\n" if image_b64 else "",
         issues=("Problems the checker found in the current layout:\n" + "\n".join(f"- {i}" for i in issues) +
-                "\nPut up to 3 fixes in \"suggestions\": move / rotate, swap to a smaller size (e.g. queen instead of king), or remove. "
+                "\nPut up to 2 fixes in \"suggestions\": move / rotate to a free span, swap to a smaller size (e.g. queen instead of king), or remove. "
                 "Keep what the user asked for.\n") if issues else "")
-    cfg = types.GenerateContentConfig(response_mime_type="application/json", http_options=types.HttpOptions(timeout=TIMEOUT_MS))
-    log.info("agent request: %r (walls=%d, furniture=%d, screenshot=%s, issues=%d)", text[:200], len(walls), len(furniture), bool(image_b64), len(issues))
+    cfgs = {n: types.GenerateContentConfig(response_mime_type="application/json", thinking_config=THINKING,
+                                           http_options=types.HttpOptions(timeout=ms))
+            for n, ms in ((1, TIMEOUT_MS), (2, RETRY_TIMEOUT_MS))}
+    log.info("agent request: %r (walls=%d, furniture=%d, screenshot=%s, issues=%d, history=%d)", text[:200], len(walls),
+             len(furniture), bool(image_b64), len(issues), len(history))
     last = None
     for attempt in (1, 2):
         t = time.perf_counter()
@@ -178,12 +219,12 @@ def plan_actions(client, text, walls, furniture, image_b64=None, issues=None):
             contents = prompt
             if image_b64 and attempt == 1:
                 contents = [types.Part.from_bytes(data=base64.b64decode(image_b64), mime_type="image/jpeg"), prompt]
-            resp = client.models.generate_content(model=HYDROGEN, contents=contents, config=cfg)
+            resp = client.models.generate_content(model=HYDROGEN, contents=contents, config=cfgs[attempt])
             raw = resp.text
             plan = _parse(raw)
             ms = round((time.perf_counter() - t) * 1000)
             log.info("agent ok attempt=%d %d ms say=%r actions=%s", attempt, ms, plan.say[:120],
-                     [(a.op, a.label or a.target, a.wall, a.position) for a in plan.actions])
+                     [(a.op, a.label or a.target, a.wall, a.position, a.next_to) for a in plan.actions])
             u = resp.usage_metadata
             usage = {"input_tokens": u.prompt_token_count, "output_tokens": u.candidates_token_count,
                      "thought_tokens": u.thoughts_token_count} if u else None

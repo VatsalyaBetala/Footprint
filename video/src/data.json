@@ -1,0 +1,514 @@
+{
+ "plan1": {
+  "w": 645,
+  "h": 475,
+  "scale": 20.24,
+  "rooms": [
+   {
+    "id": "r1",
+    "label": "Verandah",
+    "polygon": [
+     [
+      100,
+      106
+     ],
+     [
+      100,
+      238
+     ],
+     [
+      10,
+      238
+     ],
+     [
+      10,
+      106
+     ]
+    ],
+    "verified": false,
+    "confidence": 0.616,
+    "area_sqft": 29.0,
+    "printed_dims_ft": [
+     6.375,
+     4.5
+    ],
+    "verify_log": [
+     {
+      "iteration": 0,
+      "verified": false,
+      "confidence": 0.616,
+      "method": "box_only",
+      "alignment": 2.23
+     }
+    ]
+   },
+   {
+    "id": "r2",
+    "label": "Kitchen",
+    "polygon": [
+     [
+      257,
+      114
+     ],
+     [
+      257,
+      233
+     ],
+     [
+      108,
+      233
+     ],
+     [
+      108,
+      114
+     ]
+    ],
+    "verified": false,
+    "confidence": 0.538,
+    "area_sqft": 43.3,
+    "printed_dims_ft": [
+     6.0,
+     7.0
+    ],
+    "verify_log": [
+     {
+      "iteration": 0,
+      "verified": false,
+      "confidence": 0.538,
+      "method": "box_fallback",
+      "alignment": 2.14
+     }
+    ]
+   },
+   {
+    "id": "r3",
+    "label": "Stairs",
+    "polygon": [
+     [
+      401,
+      114
+     ],
+     [
+      401,
+      254
+     ],
+     [
+      265,
+      254
+     ],
+     [
+      265,
+      114
+     ]
+    ],
+    "verified": true,
+    "confidence": 0.821,
+    "area_sqft": 46.5,
+    "printed_dims_ft": null,
+    "verify_log": [
+     {
+      "iteration": 0,
+      "verified": true,
+      "confidence": 0.821,
+      "method": "box_only",
+      "alignment": 2.58
+     }
+    ]
+   },
+   {
+    "id": "r4",
+    "label": "Drawing / Dining",
+    "polygon": [
+     [
+      19,
+      241
+     ],
+     [
+      19,
+      419
+     ],
+     [
+      403,
+      419
+     ],
+     [
+      403,
+      241
+     ],
+     [
+      401,
+      241
+     ],
+     [
+      401,
+      254
+     ],
+     [
+      265,
+      254
+     ],
+     [
+      265,
+      241
+     ]
+    ],
+    "verified": false,
+    "confidence": 0.563,
+    "area_sqft": 162.5,
+    "printed_dims_ft": [
+     9.0,
+     18.5
+    ],
+    "verify_log": [
+     {
+      "iteration": 0,
+      "verified": false,
+      "confidence": 0.281,
+      "method": "color",
+      "alignment": 1.69
+     },
+     {
+      "iteration": 1,
+      "verified": false,
+      "confidence": 0.563,
+      "method": "box_fallback",
+      "alignment": 2.35
+     }
+    ]
+   },
+   {
+    "id": "r5",
+    "label": "Bedroom",
+    "polygon": [
+     [
+      616,
+      114
+     ],
+     [
+      616,
+      314
+     ],
+     [
+      408,
+      314
+     ],
+     [
+      408,
+      114
+     ]
+    ],
+    "verified": true,
+    "confidence": 0.731,
+    "area_sqft": 101.5,
+    "printed_dims_ft": [
+     10.0,
+     11.0
+    ],
+    "verify_log": [
+     {
+      "iteration": 0,
+      "verified": true,
+      "confidence": 0.731,
+      "method": "box_fallback",
+      "alignment": 2.34
+     }
+    ]
+   },
+   {
+    "id": "r6",
+    "label": "Toilet",
+    "polygon": [
+     [
+      9,
+      429
+     ],
+     [
+      626,
+      427
+     ],
+     [
+      524,
+      425
+     ],
+     [
+      524,
+      423
+     ],
+     [
+      548,
+      420
+     ],
+     [
+      547,
+      319
+     ],
+     [
+      407,
+      319
+     ],
+     [
+      407,
+      420
+     ],
+     [
+      419,
+      426
+     ]
+    ],
+    "verified": false,
+    "confidence": 0.635,
+    "area_sqft": 37.8,
+    "printed_dims_ft": [
+     5.0,
+     7.0
+    ],
+    "verify_log": [
+     {
+      "iteration": 0,
+      "verified": false,
+      "confidence": 0.635,
+      "method": "color",
+      "alignment": 2.15
+     }
+    ]
+   },
+   {
+    "id": "r7",
+    "label": "Rear Open",
+    "polygon": [
+     [
+      616,
+      321
+     ],
+     [
+      616,
+      419
+     ],
+     [
+      556,
+      419
+     ],
+     [
+      556,
+      321
+     ]
+    ],
+    "verified": false,
+    "confidence": 0.556,
+    "area_sqft": 14.4,
+    "printed_dims_ft": [
+     5.0,
+     4.0
+    ],
+    "verify_log": [
+     {
+      "iteration": 0,
+      "verified": false,
+      "confidence": 0.556,
+      "method": "box_only",
+      "alignment": 2.54
+     }
+    ]
+   }
+  ],
+  "history": [
+   0.339,
+   0.339,
+   0.339
+  ],
+  "legal": [
+   {
+    "room": "r5",
+    "label": "BEDROOM",
+    "legal": true,
+    "checks": {
+     "area_ge_80": true,
+     "min_width_ge_8ft": true
+    },
+    "reason": "110 sq ft, 10.0 ft min width (printed dims)",
+    "measurement_source": "printed",
+    "measurements": {
+     "printed_sqft": 110.0,
+     "geometry_sqft": 101.5,
+     "agree": true
+    }
+   }
+  ],
+  "area": {
+   "from_printed": 402.2,
+   "from_geometry": 435.1,
+   "agree": true,
+   "printed_coverage": [
+    6,
+    7
+   ]
+  },
+  "claim_sqft": 1395.0,
+  "repairs": [
+   {
+    "iteration": 1,
+    "room": "r4",
+    "choice": "use_box",
+    "partner": null,
+    "accepted": true,
+    "score_before": 0.339,
+    "score_after": 0.339,
+    "confidence_before": 0.281,
+    "confidence_after": 0.563
+   },
+   {
+    "iteration": 1,
+    "room": "r6",
+    "choice": "use_box",
+    "partner": null,
+    "accepted": false,
+    "score_before": 0.339,
+    "score_after": 0.339,
+    "confidence_before": 0.635,
+    "confidence_after": 0.468
+   },
+   {
+    "iteration": 2,
+    "room": "r4",
+    "choice": "reseed",
+    "partner": null,
+    "accepted": false,
+    "score_before": 0.339,
+    "score_after": 0.339,
+    "confidence_before": 0.563,
+    "confidence_after": 0.281
+   },
+   {
+    "iteration": 2,
+    "room": "r6",
+    "choice": "reseed",
+    "partner": null,
+    "accepted": false,
+    "score_before": 0.339,
+    "score_after": 0.339,
+    "confidence_before": 0.635,
+    "confidence_after": 0.635
+   }
+  ],
+  "verify_ms": 14667
+ },
+ "synthetic": {
+  "w": 1200,
+  "h": 900,
+  "scale": 28.89,
+  "bedroom": {
+   "label": "Bedroom 1",
+   "polygon": [
+    [
+     157,
+     516
+    ],
+    [
+     158,
+     803
+    ],
+    [
+     505,
+     802
+    ],
+    [
+     504,
+     515
+    ]
+   ],
+   "area_sqft": 119.4
+  },
+  "fits": {
+   "king": {
+    "fits": false,
+    "verdict": "tight",
+    "reason": "Not with a 3 ft walkway: needs 12.3 \u00d7 9.7 ft, or 12.7 \u00d7 9.3 ft turned sideways; room is 12.0 \u00d7 9.9 ft. Closest fit: against a wall, leaving 2.5 ft of walkway. 2 spots work (tried 8 orientations).",
+    "walkway_ft": 2.5,
+    "placement": [
+     [
+      419.3,
+      608.9
+     ],
+     [
+      419.3,
+      801.6
+     ],
+     [
+      236.4,
+      801.6
+     ],
+     [
+      236.4,
+      608.9
+     ]
+    ],
+    "orientations_tried": 8,
+    "spots_clear": 2,
+    "w": 6.33,
+    "d": 6.67
+   },
+   "queen": {
+    "fits": true,
+    "verdict": "fits",
+    "reason": "Fits against a wall with 3 ft walkway on 3 sides. 1 spot works (tried 8 orientations).",
+    "walkway_ft": 3.0,
+    "placement": [
+     [
+      395.3,
+      608.9
+     ],
+     [
+      395.3,
+      801.6
+     ],
+     [
+      250.9,
+      801.6
+     ],
+     [
+      250.9,
+      608.9
+     ]
+    ],
+    "orientations_tried": 8,
+    "spots_clear": 1,
+    "w": 5.0,
+    "d": 6.67
+   }
+  }
+ },
+ "hotel": {
+  "dims": {
+   "w": {
+    "low": 9.35,
+    "best": 12.5,
+    "high": 17.25
+   },
+   "d": {
+    "low": 12.75,
+    "best": 16.5,
+    "high": 24.15
+   }
+  },
+  "area_sqft": 206.2,
+  "area_range": [
+   119.2,
+   416.6
+  ],
+  "ceiling": {
+   "low": 7.65,
+   "best": 9.5,
+   "high": 11.5
+  },
+  "flags": [
+   "two_model_agree",
+   "weak_reference_door",
+   "weak_reference_corners"
+  ],
+  "options": [
+   "Zoned Living & Dining",
+   "Right-Corner Suite",
+   "Left-Corner Retreat"
+  ]
+ }
+}

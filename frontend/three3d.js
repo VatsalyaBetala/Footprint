@@ -13,7 +13,7 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 const WALL_H = 8.5, LOW_H = 3, WALL_T = 0.35, EYE_H = 5.2, SWOOP_MS = 3000;
 const FOV_OUT = 50, FOV_IN = 72; // wider lens at eye level so a small room still shows its floor
 const FALLBACK_SCALE = 20; // px/ft, display only when scale is undetermined (a NOT TO SCALE badge is shown)
-const WALL_COLOR = 0xf4f1ea, WIN_UNCONFIRMED = 0xb8c0cc;
+const WALL_COLOR = 0xf4f1ea, WIN_UNCONFIRMED = 0xc4bcae;
 
 let renderer, labelRenderer, scene, camera, controls, container, caption, notice;
 let model = null, scale = FALLBACK_SCALE, center = [0, 0];
@@ -84,7 +84,7 @@ function build(m) {
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(css("--bg"));
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa3b2, 1.3));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xa69e8f, 1.3));
   scene.add(new THREE.AmbientLight(0xffffff, 0.9)); // vertical wall faces read as off-white, not grey
   const sun = new THREE.DirectionalLight(0xffffff, 1.3);
   sun.position.set(25, 45, 18);
@@ -100,7 +100,7 @@ function build(m) {
   ground.position.y = -0.02;
   ground.receiveShadow = true;
   scene.add(ground);
-  const grid = new THREE.GridHelper(span * 3, Math.round(span * 3), 0xcbd5e1, 0xe2e8f0); // 1 ft grid
+  const grid = new THREE.GridHelper(span * 3, Math.round(span * 3), 0xcbc3b2, 0xe3ded2); // 1 ft grid
   grid.position.y = -0.01;
   scene.add(grid);
 
@@ -124,7 +124,7 @@ function addRoom(r, wallMat) {
 
   // floor: status colour; failing rooms pulse
   const floorMat = new THREE.MeshStandardMaterial({
-    color: { ok: css("--ok"), fail: css("--bad"), unverified: 0xf8fafc }[status],
+    color: { ok: css("--ok"), fail: css("--bad"), unverified: 0xfbf9f4 }[status],
     transparent: true, opacity: status === "ok" ? 0.35 : status === "fail" ? 0.6 : 0.9,
     emissive: status === "fail" ? new THREE.Color(css("--bad")) : new THREE.Color(0x000000),
     emissiveIntensity: status === "fail" ? 0.35 : 0,
@@ -223,8 +223,8 @@ function addWindow(w) {
   if (!best || best.d > 3) return;
   const ext = w.on_exterior_wall === true;
   const pane = new THREE.Mesh(new THREE.BoxGeometry(3, 1, WALL_T + 0.12),
-    new THREE.MeshStandardMaterial({ color: ext ? 0x8ec5ff : WIN_UNCONFIRMED, transparent: true, opacity: 0.9,
-                                     emissive: ext ? 0x3d7bd9 : 0x000000, emissiveIntensity: ext ? 0.35 : 0 }));
+    new THREE.MeshStandardMaterial({ color: ext ? 0xa9bccd : WIN_UNCONFIRMED, transparent: true, opacity: 0.9,
+                                     emissive: ext ? 0x27466b : 0x000000, emissiveIntensity: ext ? 0.35 : 0 }));
   pane.position.set(best.q[0], 0, best.q[1]);
   pane.rotation.y = -best.ang;
   scene.add(pane);
@@ -244,7 +244,7 @@ function addPaths() {
   const paths = Array.isArray(c) ? c : c?.per_room?.length ? c.per_room : c?.path ? [c] : [];
   paths.forEach((p) => {
     if (!p.path || p.path.length < 2) return;
-    const color = p.ok === true ? css("--accent") : p.ok === false ? css("--bad") : 0x94a3b8;
+    const color = p.ok === true ? css("--accent") : p.ok === false ? css("--bad") : 0xa69e8f;
     addPolylineStrip(p.path.map(toWorld), new THREE.MeshBasicMaterial({ color }), 0.04, scene);
   });
 }
@@ -288,7 +288,7 @@ function addEntrance(e) {
 function makeFurniture(kind, b, back, fits, h) {
   const g = new THREE.Group();
   const w = b.x1 - b.x0, d = b.z1 - b.z0, cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
-  const main = new THREE.MeshStandardMaterial({ color: fits ? 0xe9f7f1 : 0xfde2e2, roughness: 0.8 });
+  const main = new THREE.MeshStandardMaterial({ color: fits ? 0xe8eee6 : 0xf4e3dd, roughness: 0.8 });
   const accent = new THREE.MeshStandardMaterial({ color: fits ? css("--sys") || css("--ok") : css("--bad"), roughness: 0.7 });
   const box = (bw, bh, bd, x, y, z, mat) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat);

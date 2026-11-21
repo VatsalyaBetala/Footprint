@@ -22,6 +22,7 @@ DISAGREE = "measurements disagree; not judged"
 FIT_STEP_FT = 0.25             # 3 in grid-search step
 DOOR_NEAR_FT = 1.0             # a door belongs to a room if its centre is within 1 ft of it
 DEFAULT_DOOR_FT = 2.67         # ⚠️ assumed (standard 32 in door) when Carbon gives no width
+DOUBLE_DOOR_FT = 4.0           # ⚠️ judgement call: an opening wider than this is a double door (two half-width leaves)
 SWING_BLOCKS_CLEARANCE = False  # ⚠️ judgement call: a swing may cross the walkway, never the object
 PERSON_WIDTH_FT = 1.5          # 18 in shoulder width → shrink free space 9 in from every wall
 DOOR_OPENING_DEPTH_FT = 2.0    # opening rectangle bridges walls up to ~2 ft thick
@@ -153,6 +154,109 @@ def fit(room, w_ft, d_ft, clearance_ft, doors, scale):
     return {"fits": False, "placement": None, "orientation": None, "orientations_tried": len(layouts), "reason": why}
 
 
+def fit_candidates(room, w_ft, d_ft, clearance_ft, doors, scale, max_n=24, spacing_ft=1.5):
+    """Every distinct valid spot for a w×d object over all 8 orientations (same rules as fit()), best first:
+    against a wall before free-standing, standard before sideways; spots closer than spacing_ft to an
+    already-kept spot with the same footprint are skipped. Each: {placement (px), orientation, against_wall}.
+    The caller decides between them (e.g. the first one that keeps the way out clear)."""
+    poly = _poly(room)
+    if not scale or poly.is_empty:
+        return []
+    step = FIT_STEP_FT * scale
+    inside = prep(poly.buffer(0.02 * scale))
+    swings = _door_swings(poly, doors, scale)
+    swing = prep(unary_union(swings)) if swings else None
+    wall = poly.boundary.buffer(step)
+    x0, y0, x1, y1 = poly.bounds
+    w, d, c = w_ft * scale, d_ft * scale, clearance_ft * scale
+    layouts = [(lay, "standard") for lay in _layouts(w, d, c)]
+    if abs(w_ft - d_ft) > 1e-9:
+        layouts += [(lay, "sideways") for lay in _layouts(d, w, c)]
+    found = []
+    for (fw, fh, ob, (b0, b1)), orient in layouts:
+        for x in _steps(x0, x1 - fw, step):
+            for y in _steps(y0, y1 - fh, step):
+                if not inside.contains(box(x, y, x + fw, y + fh)):
+                    continue
+                obj = box(x + ob[0], y + ob[1], x + ob[2], y + ob[3])
+                if swing and swing.intersects(box(x, y, x + fw, y + fh) if SWING_BLOCKS_CLEARANCE else obj):
+                    continue
+                back = LineString([(x + b0[0], y + b0[1]), (x + b1[0], y + b1[1])])
+                against = back.difference(wall).length <= 0.1 * back.length
+                found.append((not against, orient != "standard", obj, orient, against))
+    found.sort(key=lambda f: (f[0], f[1]))
+    kept, gap = [], spacing_ft * scale
+    for _, _, obj, orient, against in found:
+        bx = obj.bounds
+        shape = round(bx[2] - bx[0])                          # footprint width in px: distinguishes turned copies
+        if any(k[3] == shape and obj.centroid.distance(k[0].centroid) < gap for k in kept):
+            continue
+        kept.append((obj, orient, against, shape))
+        if len(kept) >= max_n:
+            break
+    return [{"placement": _coords(o), "orientation": orient, "against_wall": a} for o, orient, a, _ in kept]
+
+
+def closest_spot(room, w_ft, d_ft, doors, scale):
+    """When a w×d object fits nowhere: the spot where it pokes out of the walls least (both orientations,
+    3 in grid over the room's box), out of door swings when possible, pushed into a corner on ties.
+    For SHOWING how badly it misses, never as a fit. {placement, rotation, overflow_sqft, too_big_ft: [x, y]}."""
+    poly = _poly(room)
+    if not scale or poly.is_empty:
+        return None
+    swings = unary_union(_door_swings(poly, doors, scale) or [Polygon()])
+    x0, y0, x1, y1 = poly.bounds
+    step, best = FIT_STEP_FT * scale, None
+    for fw, fh, rot in ((w_ft * scale, d_ft * scale, 0), (d_ft * scale, w_ft * scale, 90)):
+        xs = _steps(x0, x1 - fw, step) if x1 - x0 >= fw else [(x0 + x1 - fw) / 2]
+        ys = _steps(y0, y1 - fh, step) if y1 - y0 >= fh else [(y0 + y1 - fh) / 2]
+        for x in xs:
+            for y in ys:
+                obj = box(x, y, x + fw, y + fh)
+                out = obj.area - obj.intersection(poly).area
+                key = (round(out / scale ** 2, 1), round(obj.intersection(swings).area / scale ** 2, 1),
+                       round(min(x - x0, x1 - x - fw) + min(y - y0, y1 - y - fh)))
+                if best is None or key < best[0]:
+                    best = (key, obj, rot, fw, fh)
+    (out, _, _), obj, rot, fw, fh = best
+    return {"placement": _coords(obj), "rotation": rot, "overflow_sqft": out,
+            "too_big_ft": [round(max(0, fw - (x1 - x0)) / scale, 1), round(max(0, fh - (y1 - y0)) / scale, 1)]}
+
+
+def check_spot(room, placement, doors, scale, max_ft=15.0):
+    """A placement chosen by hand (px polygon, 4 corners in order): inside the room? clear of door swings?
+    Free floor beyond each side, in ft (0 = against a wall, capped at max_ft). Side names are plan
+    directions (top = smaller y)."""
+    poly = _poly(room)
+    if not scale or poly.is_empty:
+        return {"inside": None, "door_blocked": None, "sides": [], "reason": NO_SCALE if not scale else NO_POLYGON}
+    pts = np.asarray(placement, float)[:4]
+    obj = Polygon(pts)
+    room_in = prep(poly.buffer(0.02 * scale))
+    inside = room_in.contains(obj)
+    door_blocked = any(obj.intersects(s) for s in _door_swings(poly, doors, scale))
+    c, sides = pts.mean(0), []
+    for i in range(4):
+        a, b = pts[i], pts[(i + 1) % 4]
+        e = b - a
+        n = np.array([-e[1], e[0]]) / (np.hypot(*e) or 1)
+        if np.dot(n, (a + b) / 2 - c) < 0:
+            n = -n                                          # outward normal
+        lo, hi = 0.0, max_ft
+        if not inside or room_in.contains(Polygon([a, b, b + n * hi * scale, a + n * hi * scale])):
+            lo = hi if inside else 0.0
+        else:
+            while hi - lo > 0.05:                           # strip containment is monotone in depth: bisect
+                mid = (lo + hi) / 2
+                if room_in.contains(Polygon([a, b, b + n * mid * scale, a + n * mid * scale])):
+                    lo = mid
+                else:
+                    hi = mid
+        name = ("right" if n[0] > 0 else "left") if abs(n[0]) >= abs(n[1]) else ("bottom" if n[1] > 0 else "top")
+        sides.append({"side": name, "gap_ft": round(lo, 1), "length_ft": round(float(np.hypot(*e)) / scale, 2)})
+    return {"inside": inside, "door_blocked": door_blocked, "sides": sides}
+
+
 def clear_path(rooms, doors, entrance, scale, obstacles=None):
     """Per bedroom: can an 18 in wide person walk from it to the entrance?
 
@@ -282,9 +386,10 @@ def _door_swings(poly, doors, scale):
         # when standing inside this room facing the door.
         left = np.array([-n[1], n[0]])
         t = np.linspace(0, np.pi / 2, 12)[:, None]
-        for s in {"left": [1], "right": [-1]}.get(d.get("hinge"), [1, -1]):
+        double = r > DOUBLE_DOOR_FT * scale      # two leaves of half the width, hinged at both ends
+        for s in [1, -1] if double else {"left": [1], "right": [-1]}.get(d.get("hinge"), [1, -1]):
             hinge = c + s * left * r / 2
-            arc = hinge + r * (np.cos(t) * (-s * left) + np.sin(t) * n)
+            arc = hinge + (r / 2 if double else r) * (np.cos(t) * (-s * left) + np.sin(t) * n)
             out.append(Polygon([hinge, *arc]))
     return out
 

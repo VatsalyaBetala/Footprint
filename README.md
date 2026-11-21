@@ -13,12 +13,13 @@ Built at the Gemini 4 NYC Hackathon (Problem Statement 1).
 |---|---|---|
 | **1. Check the listing** | The floor plan image from the listing | Every room traced and measured; real square footage vs. the listing's claim; each bedroom checked against NYC minimums (at least 80 sq ft and 8 ft wide) |
 | **2. Measure a room** | A 15–30 s phone video of one room (no floor plan needed) | Width × depth with honest ranges, ceiling height, a plan drawn from the video, and a comparison with the plan's printed size |
-| **3. Fit your furniture** | A room, plus a bed, sofa or desk (presets, custom size, or by voice) | Placed against a wall with walkway clearance, out of door swings, with a check that you can still walk to the entrance; 2D and 3D views |
+| **3. Fit your furniture** | A room, plus a bed, sofa or desk (presets, custom size, or by voice) | Every spot in all 8 orientations is tried; you get the best one that keeps the walkway, stays out of door swings and leaves the way to the entrance clear. If it only fits with a narrower walkway, it says by how much. Drag the piece, turn it or step through the other spots, and each one is re-checked; 2D and 3D views |
 
 For a filmed room, the **interactive CAD view** shows every wall dimension and the ceiling height. Drag
 furniture to see live gaps to the walls, or type requests such as *"put a queen bed under the window and
 a desk by the door"* or *"show me other layouts"*. An agent places the pieces, a checker flags overlaps,
-blocked door swings and walkways under 2 ft, and the agent suggests fixes you can apply with one click.
+blocked door swings and walkways under 2 ft, and the agent suggests fixes. A fix is shown only if it actually reduces the problems when
+tested on a copy of the layout.
 
 ## How it works
 
@@ -38,8 +39,11 @@ and deterministic code.
 - The polygon is then built deterministically. It must close, it is cross-checked against Neon, and its ranges widen when the evidence is weak.
 
 **Furniture agent** (`POST /cad_agent`, `agent.py`)
-- **Gemini 4 Hydrogen** reads the request plus a screenshot of the 3D view. For each piece it picks a wall, a position along it and a gap.
-- `cad3d.js` computes the exact placement and runs the checks.
+- **Gemini 4 Hydrogen** (low thinking, 5–15 s) reads the request, a screenshot of the 3D view, where every piece stands
+  (wall + span), each wall's free spans, and the last few requests. For each piece it picks a wall, a position along it
+  (or "next to" another piece) and a gap.
+- `cad3d.js` computes the exact placement. If that spot overlaps a piece, a door swing or a wall, it slides the piece to the
+  nearest free spot: the same wall first, then other walls, then turned, then open floor. It then runs the checks.
 
 **Voice** (`POST /voice`): Hydrogen turns a spoken question into a fit query.
 
@@ -103,9 +107,10 @@ restart the backend and run:
 |---|---|---|
 | `POST /analyze` | multipart `file`: floor plan image | `model.json` (contract in `CLAUDE.md`) |
 | `POST /scan` | multipart `file`: room video (5–60 s) | `model.json` for the filmed room (dimension ranges, ceiling, plan PNG) |
-| `POST /query` | JSON `{model_id, w_ft, d_ft, clearance_ft, room_label}` | fit + clear path with the piece placed |
+| `POST /query` | JSON `{model_id, w_ft, d_ft, clearance_ft, room_label}` | verdict (`fits` / `tight` / `blocks_path` / `no_fit`), best spot, up to 12 other spots, clear path |
+| `POST /check_placement` | JSON `{model_id, room_label, w_ft, d_ft, center_px, rotation_deg, clearance_ft}` | verdict for a spot you chose: inside the walls, door swings, walkway per side, clear path |
 | `POST /voice` | multipart `audio` + `model_id` | spoken question → the same fit |
-| `POST /cad_agent` | JSON `{text, walls, furniture, image_b64?, issues?}` | placement actions, alternative layouts, fix suggestions |
+| `POST /cad_agent` | JSON `{text, walls, furniture, image_b64?, issues?, history?}` | placement actions (one layout at a time), fix suggestions |
 | `GET /model/{id}`, `GET /health` | | stored model; module status and model warm-up |
 
 Every failure comes back as JSON with an `errors` list, never as a 500 page. `/analyze` has a 45 s hard

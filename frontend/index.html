@@ -18,6 +18,7 @@
   --float: 0 4px 16px rgba(15, 23, 42, .06);
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 400 14px/20px var(--sans); padding-bottom: 88px; }
 .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 button, input, select { font: inherit; color: inherit; }
@@ -293,6 +294,7 @@ td.best { color: var(--sys); font-weight: 600; }
           <label class="field"><span class="label">Room</span><select id="fit-room"></select></label>
         </div>
         <button class="btn primary" id="fit-go">Check fit</button>
+        <button class="btn" id="fit-sample" hidden>Analyze sample plan (live backend)</button>
         <div id="fit-out"></div>
       </div>
       <div class="canvas"><svg id="plan-fit"></svg></div>
@@ -325,11 +327,12 @@ const params = new URLSearchParams(location.search);
 const API = params.get("api") || "http://localhost:8000";
 const MOCKS = { ok: ["../samples/mock_model.json", "mock_plan.svg"],
                 noscale: ["../samples/mock_model_noscale.json", "mock_plan_nodims.svg"] };
+const SAMPLE_PLAN = "../samples/synthetic_2br.png";
 const RESULTS = ["../eval/results.json", "../samples/mock_results.json"];
 const STAGES = ["Reading plan…", "Tracing rooms…", "Verifying…", "Checking code…"];
 const PRESETS = [
-  { name: "King bed", w: 6.33, d: 6.67, c: 3 }, { name: "Queen bed", w: 5, d: 6.67, c: 3 },
-  { name: "Sofa 7 ft", w: 7, d: 3, c: 1.5 }, { name: "Desk", w: 4, d: 2, c: 3 }, { name: "Custom", w: null, d: null, c: 1.5 },
+  { name: "King bed", w: 6.33, d: 6.67, c: 3, h: 2 }, { name: "Queen bed", w: 5, d: 6.67, c: 3, h: 2 },
+  { name: "Sofa 7 ft", w: 7, d: 3, c: 1.5, h: 2.8 }, { name: "Desk", w: 4, d: 2, c: 3, h: 2.5 }, { name: "Custom", w: null, d: null, c: 1.5, h: 2.5 },
 ];
 const NOT_INFO_FLAGS = new Set(["no_printed_dims", "no_scale"]); // informational, not warnings
 
@@ -363,9 +366,10 @@ async function analyze(file) {
   setVerdict("pending", "Analyzing…", "This takes about 15–25 seconds.");
   try {
     const form = new FormData();
-    form.append("image", file); // ⚠️ uncertain — confirm field name with server.py
+    form.append("file", file); // server.py: multipart "file"
     model = await getJSON(`${API}/analyze`, { method: "POST", body: form, signal: withTimeout(90000) });
     isMock = false;
+    if (model.partial && model.model_id) pollFull(model.model_id);
   } catch (err) {
     console.warn("analyze failed → mock", err);
     const [m, img] = MOCKS.ok;
@@ -376,9 +380,26 @@ async function analyze(file) {
   render();
 }
 
+// /analyze returns a partial model after its 45 s deadline; the full one lands at GET /model/{id}.
+async function pollFull(id) {
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    if (model?.model_id !== id) return; // user moved on
+    try {
+      const m = await getJSON(`${API}/model/${id}`, { signal: withTimeout(5000) });
+      if (!m.partial) { model = m; render(); return; }
+    } catch {}
+  }
+}
+async function analyzeSample() {
+  const blob = await (await fetch(SAMPLE_PLAN)).blob();
+  analyze(new File([blob], "synthetic_2br.png", { type: "image/png" }));
+}
+
 // ---------------- render ----------------
 function render() {
   timers.forEach(clearTimeout); timers = [];
+  fitResult = null;
   $("mock-badge").hidden = !isMock;
   $("source-line").textContent = isMock ? "Backend offline — showing mock data" : `Live · ${API}`;
   drawPlan($("plan-verify"), { anim: true });
@@ -388,6 +409,7 @@ function render() {
   renderArea(); renderRooms(); renderAnswers(); renderFit();
   built3d = null;
   if (tab === "3d") build3d();
+  $("fit-sample").hidden = !isMock;
 }
 
 function status(r) {
@@ -444,7 +466,7 @@ function drawPlan(svg, { anim, paths }) {
   if (svg.id === "plan-fit" && fitResult) drawFitRect(svg);
 }
 function highlight(id, on) { document.querySelectorAll(`.room[data-id="${id}"]`).forEach((p) => p.classList.toggle("hl", on)); }
-function clearPaths() { const c = model.answers?.clear_path; return Array.isArray(c) ? c : c ? [c] : []; }
+function clearPaths(c = model.answers?.clear_path) { return Array.isArray(c) ? c : c?.per_room?.length ? c.per_room : c?.from ? [c] : []; }
 
 function animateScore() {
   const hist = model.alignment_score_history || [];
@@ -568,7 +590,7 @@ function renderArea() {
     <div><span>From printed dims</span><span class="v">${a.from_printed != null ? `${n0(a.from_printed)} sq ft` : "—"}</span></div>
     <div><span>From traced geometry</span><span class="v">${a.from_geometry != null ? `${n0(a.from_geometry)} sq ft` : "—"}</span></div>
     <div><span>Listing claims</span><span class="v">${a.listing_claim != null ? `${n0(a.listing_claim)} sq ft` : "—"}</span></div>
-    <div><span class="k">${a.printed_coverage != null ? `Printed dims cover ${Math.round(a.printed_coverage * 100)}% of area` : ""}</span>${verdict}</div>
+    <div><span class="k">${Array.isArray(a.printed_coverage) ? `Printed dims on ${a.printed_coverage[0]} of ${a.printed_coverage[1]} rooms` : a.printed_coverage != null ? `Printed dims cover ${Math.round(a.printed_coverage * 100)}% of area` : ""}</span>${verdict}</div>
     <div><span class="k">Scale</span><span class="v">${model.scale_px_per_ft != null ? `${n1(model.scale_px_per_ft)} px/ft` : "—"} · ${esc(model.scale_status)}</span></div>`;
 }
 function renderRooms() {
@@ -596,48 +618,99 @@ function wireHover(id) {
 }
 
 // ---------------- fit ----------------
+// Fit is computed ONLY by the backend solver (POST /query on a live model_id); nothing is estimated here.
 let preset = 0;
+const live = () => !isMock && !!model.model_id;
 function renderFit() {
-  const off = noScale();
-  $("fit-sub").textContent = off ? "Can't measure: no scale on this plan." : "Checked against the traced room shape, with clearance.";
-  $("fit-form").querySelectorAll("input,select,button").forEach((n) => (n.disabled = off));
-  $("presets").innerHTML = PRESETS.map((p, i) => `<button data-i="${i}" class="${i === preset ? "on" : ""}">${p.name}</button>`).join("");
+  const off = noScale(), on = live() && !off;
+  $("fit-sub").textContent = off ? "Can't measure: no scale on this plan."
+    : on ? "Placed by the solver: back to a wall, clearance on 3 sides, clear of door swings."
+    : "Fit runs on a live model. Upload a plan, or analyze the sample plan.";
+  $("fit-form").querySelectorAll("input,select,#fit-go,#presets button").forEach((n) => (n.disabled = !on));
+  $("presets").innerHTML = PRESETS.map((p, i) => `<button data-i="${i}" class="${i === preset ? "on" : ""}" ${on ? "" : "disabled"}>${p.name}</button>`).join("");
   $("presets").querySelectorAll("button").forEach((b) => (b.onclick = () => { preset = +b.dataset.i; applyPreset(); renderFit(); }));
   const cur = $("fit-room").value;
   $("fit-room").innerHTML = model.rooms.map((r) => `<option value="${esc(r.id)}">${esc(r.label)}</option>`).join("");
-  const firstBed = model.rooms.find(isBedroom);
-  $("fit-room").value = room(cur) ? cur : firstBed?.id || model.rooms[0]?.id;
+  $("fit-room").value = room(cur) ? cur : model.rooms.find(isBedroom)?.id || model.rooms[0]?.id;
   if (!$("fit-w").value) applyPreset();
-  if (off) { $("fit-out").innerHTML = chip("warn", "CAN'T MEASURE: NO SCALE ON THIS PLAN"); fitResult = null; }
+  if (!fitResult) $("fit-out").innerHTML = off ? chip("warn", "CAN'T MEASURE: NO SCALE ON THIS PLAN")
+    : on ? "" : chip("warn", "NEEDS A LIVE MODEL");
 }
 function applyPreset() { const p = PRESETS[preset]; if (p.w) { $("fit-w").value = p.w; $("fit-d").value = p.d; } $("fit-c").value = p.c; }
+
 async function checkFit() {
   const r = room($("fit-room").value);
-  const body = { model_id: model.model_id ?? null, w_ft: +$("fit-w").value, d_ft: +$("fit-d").value, clearance_ft: +$("fit-c").value, room_label: r?.label };
+  const body = { model_id: model.model_id, w_ft: +$("fit-w").value, d_ft: +$("fit-d").value,
+                 clearance_ft: +$("fit-c").value, room_label: r.id }; // server matches id exactly
+  if (!(body.w_ft > 0 && body.d_ft > 0 && body.clearance_ft >= 0)) { $("fit-out").innerHTML = chip("warn", "ENTER A SIZE"); return; }
+  $("fit-go").disabled = true;
   $("fit-out").innerHTML = `<span class="reason">Checking…</span>`;
   try {
-    const res = await getJSON(`${API}/query`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: withTimeout(30000) });
-    // ⚠️ uncertain — /query response shape not in the contract yet; reading fits/reason/center_px/rotation_deg
-    fitResult = { room: r.id, w_ft: body.w_ft, d_ft: body.d_ft, fits: res.fits ?? res.fit?.fits ?? null,
-                  reason: res.reason ?? res.fit?.reason ?? "", center_px: res.center_px ?? res.fit?.center_px ?? null,
-                  rotation_deg: res.rotation_deg ?? res.fit?.rotation_deg ?? 0 };
-    $("fit-out").innerHTML = `<div class="score-row">${fitResult.fits ? chip("ok", "FITS") : fitResult.fits === false ? chip("bad", "DOESN'T FIT") : chip("warn", "CAN'T TELL")}</div><div class="reason" style="margin-top:8px">${esc(fitResult.reason)}</div>`;
-    drawPlan($("plan-fit"), { anim: false });
-    try { window.Footprint3D?.showFurniture(fitResult); } catch (e) { console.warn(e); }
+    const res = await fetch(`${API}/query`, { method: "POST", headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify(body), signal: withTimeout(30000) });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    const fit = d.fit || {};
+    fitResult = { room: d.room || r.id, label: d.label || r.label, w_ft: body.w_ft, d_ft: body.d_ft, c_ft: body.clearance_ft,
+                  h_ft: PRESETS[preset].h || 2.5, name: PRESETS[preset].name, fits: fit.fits ?? null, reason: fit.reason || "",
+                  placement: fit.placement || null, paths: clearPaths(d.clear_path), errors: d.errors || [] };
+    showFitResult();
   } catch (err) {
     fitResult = null;
-    $("fit-out").innerHTML = `${chip("warn", "BACKEND OFFLINE")}<div class="reason" style="margin-top:8px">/query isn't reachable (${esc(err.message)}). Fit is only computed by the solver, never estimated here.</div>`;
+    const msg = /unknown model_id/.test(err.message) ? "The server no longer has this model (restarted?). Re-upload the plan."
+      : `/query failed (${err.message}). Fit is only computed by the solver, never estimated here.`;
+    $("fit-out").innerHTML = `${chip("warn", "NOT CHECKED")}<div class="reason" style="margin-top:8px">${esc(msg)}</div>`;
+  } finally { $("fit-go").disabled = false; }
+}
+
+function showFitResult() {
+  const f = fitResult;
+  const verdict = f.fits === true ? chip("ok", "FITS") : f.fits === false ? chip("bad", "DOESN'T FIT") : chip("warn", "CAN'T TELL");
+  const blocked = f.paths.filter((p) => p.ok === false);
+  const pathLine = !f.paths.length ? "" : blocked.length
+    ? `${chip("bad", "BLOCKS PATH")} <span class="reason">${esc(blocked.map((p) => `${rname(p.from)}: ${p.reason}`).join(" · "))}</span>`
+    : f.paths.every((p) => p.ok === true) ? `${chip("ok", "PATH STAYS CLEAR")} <span class="reason">every bedroom still reaches the entrance (18 in)</span>` : "";
+  $("fit-out").innerHTML = `
+    <div class="score-row"><span style="font-weight:600">${esc(f.name)} · ${f.w_ft}×${f.d_ft} ft in ${esc(f.label)}</span>${verdict}</div>
+    <div class="reason" style="margin:8px 0">${esc(f.reason)}</div>
+    ${pathLine ? `<div style="margin-bottom:8px">${pathLine}</div>` : ""}
+    ${f.errors.length ? `<div class="reason">${esc(f.errors.map((e) => `${e.stage}: ${e.error}`).join(" · "))}</div>` : ""}
+    <button class="btn" id="fit-3d" style="margin-top:4px">View in 3D</button>`;
+  $("fit-3d").onclick = () => { go("3d"); show3dFurniture(); };
+  drawPlan($("plan-fit"), { anim: false });
+}
+
+function fitBox() { // object rectangle in px: the solver's placement, or (doesn't fit) the requested size at the room centre
+  const f = fitResult, s = model.scale_px_per_ft, r = room(f.room);
+  if (f.placement?.length) {
+    const xs = f.placement.map((p) => p[0]), ys = f.placement.map((p) => p[1]);
+    return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), placed: true };
   }
+  if (!s || !r) return null;
+  const [cx, cy] = centroid(r.polygon), w = f.w_ft * s, d = f.d_ft * s;
+  return { x0: cx - w / 2, y0: cy - d / 2, x1: cx + w / 2, y1: cy + d / 2, placed: false };
 }
 function drawFitRect(svg) {
-  const s = model.scale_px_per_ft, r = room(fitResult.room);
-  if (!s || !r) return;
-  const [cx, cy] = fitResult.center_px || centroid(r.polygon), w = fitResult.w_ft * s, d = fitResult.d_ft * s;
-  const c = fitResult.fits ? "var(--ok)" : "var(--bad)";
-  el("rect", { x: cx - w / 2, y: cy - d / 2, width: w, height: d, class: "fit-rect", fill: c, stroke: c,
-               transform: `rotate(${fitResult.rotation_deg || 0} ${cx} ${cy})` }, svg);
+  const b = fitBox(), f = fitResult;
+  f.paths.forEach((c) => c.path?.length > 1 &&
+    el("polyline", { points: c.path.map((q) => q.join(",")).join(" "), class: `cpath ${c.ok === false ? "bad" : ""}` }, svg));
+  if (!b) return;
+  const c = f.fits ? "var(--ok)" : "var(--bad)";
+  el("rect", { x: b.x0, y: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0, rx: 4, class: "fit-rect", fill: c, stroke: c,
+               "stroke-dasharray": b.placed ? "" : "8 5" }, svg);
+  const t = el("text", { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 + 5, "text-anchor": "middle", class: "rlabel", style: "opacity:1;animation:none" }, svg);
+  t.textContent = b.placed ? f.name : `${f.name}: doesn't fit`;
+}
+function show3dFurniture() {
+  const b = fitResult && fitBox(), s = model.scale_px_per_ft;
+  if (!b || !s || !window.Footprint3D) return;
+  try {
+    window.Footprint3D.showFurniture({ room: fitResult.room, fits: fitResult.fits, rotation_deg: 0, h_ft: fitResult.h_ft,
+      w_ft: (b.x1 - b.x0) / s, d_ft: (b.y1 - b.y0) / s, center_px: [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2] });
+  } catch (e) { console.warn("3D furniture failed", e); }
 }
 $("fit-go").onclick = checkFit;
+$("fit-sample").onclick = analyzeSample;
 
 // ---------------- proof / eval ----------------
 const SYS_ORDER = ["B0", "B1", "B2", "v1", "v2"];

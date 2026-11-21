@@ -19,7 +19,6 @@ MIN_BEDROOM_SQFT = 80
 MIN_BEDROOM_WIDTH_FT = 8
 MEASURE_AGREE_TOL = 0.15       # printed vs traced room area; beyond this an unverified room isn't judged
 DISAGREE = "measurements disagree; not judged"
-WINDOW_TOL_FT = 1.0            # window centre within 1 ft of the room outline
 FIT_STEP_FT = 0.25             # 3 in grid-search step
 DOOR_NEAR_FT = 1.0             # a door belongs to a room if its centre is within 1 ft of it
 DEFAULT_DOOR_FT = 2.67         # ⚠️ assumed (standard 32 in door) when Carbon gives no width
@@ -30,10 +29,6 @@ PATH_CELL_FT = 0.25            # 3 in raster cells for the path search
 SNAP_FT = 3.0                  # entrance usually sits in the wall; snap to floor within 3 ft
 NO_SCALE = "not_checkable_no_scale"
 NO_POLYGON = "not_checkable_no_polygon"
-WINDOW_UNCONFIRMED = "not_checkable_window_unconfirmed"
-WINDOW_MSG = {False: "no exterior window",
-              WINDOW_UNCONFIRMED: "window next to room, but exterior wall not confirmed",
-              NO_POLYGON: "window not checkable (no polygon)"}
 # ⚠️ spec says label contains "bed"; BDRM / BR added for NYC listing shorthand ("2BR", "BR 1")
 BEDROOM_RE = re.compile(r"bed|bdrm|(?<![a-z])br(?![a-z])")
 NBRS = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
@@ -63,13 +58,14 @@ def compute_area(rooms, scale):
 
 
 def legal_bedrooms(rooms, windows, scale):
-    """Legal-bedroom checks for every room labelled as a bedroom.
+    """Legal-bedroom checks for every room labelled as a bedroom: area >= 80 sq ft and min width >= 8 ft.
+    (Window and ceiling height are not bedroom rules here; `windows` is accepted for call compatibility only.)
 
     Area and min width come from printed_dims_ft when present (measurement_source
     "printed"), else from the traced polygon ("geometry"). The polygon cross-checks the
     printed dims: >15% apart on an unverified room -> legal None, "measurements disagree".
-    Each check is True/False or "not_checkable_*". legal = False if any check fails,
-    True only if every plan-checkable check passes, otherwise None (unknown).
+    Each check is True/False or "not_checkable_*". legal = False if either check fails,
+    True only if both pass, otherwise None (unknown).
     """
     out = []
     for r in filter(_is_bedroom, rooms):
@@ -87,15 +83,10 @@ def legal_bedrooms(rooms, windows, scale):
                 fails.append(f"{_floor(area)} sq ft < {MIN_BEDROOM_SQFT} sq ft minimum")
             if not checks["min_width_ge_8ft"]:
                 fails.append(f"{_floor(width, 1)} ft wide < {MIN_BEDROOM_WIDTH_FT} ft minimum")
-        win = checks["exterior_window"] = _has_exterior_window(poly, windows, scale)
-        if win is not True:
-            (fails if win is False else unknown).append(WINDOW_MSG[win])
-        checks["ceiling_height"] = "not_checkable_from_plan"
-        vals = [checks["area_ge_80"], checks["min_width_ge_8ft"], checks["exterior_window"]]
+        vals = [checks["area_ge_80"], checks["min_width_ge_8ft"]]
         legal = False if any(v is False for v in vals) else (True if all(v is True for v in vals) else None)
         reason = "; ".join(fails + unknown) if legal is not True else (
-            f"{area:.0f} sq ft, {width:.1f} ft min width ({source} dims), exterior window "
-            "(ceiling height not checkable from plan)")
+            f"{area:.0f} sq ft, {width:.1f} ft min width ({source} dims)")
         if agree is False and r.get("verified") is not True:
             legal, reason = None, DISAGREE   # one of the two measurements is wrong; don't guess which
         out.append({"room": r["id"], "label": r.get("label"), "legal": legal, "checks": checks,
@@ -260,21 +251,6 @@ def _floor(x, nd=0):
     """Round DOWN for '< minimum' messages so 79.6 never prints as '80 < 80'."""
     f = 10 ** nd
     return f"{math.floor(x * f + 1e-6) / f:.{nd}f}"
-
-
-def _has_exterior_window(poly, windows, scale):
-    """Windows within ~1 ft of the room outline: True if one is on an exterior wall;
-    WINDOW_UNCONFIRMED if the only nearby ones have on_exterior_wall null (verify.py sets
-    null when Decisions is unsure); False if none is nearby or all nearby are interior."""
-    if poly.is_empty:
-        return NO_POLYGON
-    # ⚠️ no scale: tolerance = 10% of the room's size (≈1 ft for a 10x10 ft room) — heuristic
-    tol = WINDOW_TOL_FT * scale if scale else 0.1 * math.sqrt(poly.area)
-    near = [w.get("on_exterior_wall") for w in windows or []
-            if w.get("center") is not None and poly.boundary.distance(Point(w["center"])) <= tol]
-    if any(v is True for v in near):
-        return True
-    return WINDOW_UNCONFIRMED if any(v is None for v in near) else False
 
 
 def _wall_axis(pt, poly):

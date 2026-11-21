@@ -260,13 +260,17 @@ const PRESETS = [{ name: "King bed", w: 6.33, d: 6.67, c: 3 }, { name: "Queen be
                  { name: "Sofa 7 ft", w: 7, d: 3, c: 2.5 }, { name: "Desk", w: 5, d: 2.5, c: 2.5 }];
 const S = { plan: null, planImg: null, scans: {}, sel: null, src: "plan", view: "2d", fit: null, busy: null, form: { ...PRESETS[0], preset: 0 }, built3d: null };
 
-async function api(path, opts = {}, ms = 90000) {
+async function api(path, opts = {}, ms = 90000, retries = 1) {
   const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), ms);
   try {
     const r = await fetch(API + path, { ...opts, signal: ctrl.signal });
     const body = await r.json().catch(() => ({}));
     if (!r.ok && !(body && body.rooms)) throw new Error(body.error || body.errors?.[0]?.error || `HTTP ${r.status}`);
     return body;
+  } catch (err) {
+    // "Failed to fetch" (TypeError) = backend unreachable, usually mid-restart: wait and try once more
+    if (err.name === "TypeError" && retries > 0) { clearTimeout(t); await new Promise((ok) => setTimeout(ok, 2500)); return api(path, opts, ms, retries - 1); }
+    throw err.name === "TypeError" ? new Error("backend not reachable (restarting?). Try again in a few seconds") : err;
   } finally { clearTimeout(t); }
 }
 function showErr(id, msg) { const e = $(id); if (e) { e.textContent = msg; e.hidden = !msg; } }
@@ -356,8 +360,8 @@ function renderAnswers() {
   const legal = beds.filter((b) => effLegal(b) === true).length, bad = beds.filter((b) => effLegal(b) === false).length, unk = beds.length - legal - bad;
   if (!beds.length) setTile("t-beds", "none", "No bedrooms labelled", "Nothing on the plan is called a bedroom.");
   else if (bad) setTile("t-beds", "bad", `No: ${legal} of ${beds.length} legal`, `${bad} bedroom${bad > 1 ? "s" : ""} fail${bad > 1 ? "" : "s"} a NYC rule. Click it for why.`);
-  else if (!unk) setTile("t-beds", "ok", `Yes: ${legal} legal bedroom${legal > 1 ? "s" : ""}`, "Size, width, window and ceiling all check out.");
-  else setTile("t-beds", "warn", `${beds.length} bedroom${beds.length > 1 ? "s" : ""}, size OK so far`, `${unk} still need${unk > 1 ? "" : "s"} a check the plan can't answer (window or ceiling). Film the room.`);
+  else if (!unk) setTile("t-beds", "ok", `Yes: ${legal} legal bedroom${legal > 1 ? "s" : ""}`, "Size and width both check out.");
+  else setTile("t-beds", "warn", `${beds.length} bedroom${beds.length > 1 ? "s" : ""}, none too small so far`, `${unk} couldn't be measured reliably from the plan. Film the room.`);
   // area
   const measured = area.from_geometry ?? area.from_printed;
   if (noScale()) setTile("t-area", "warn", "Can't measure", "No dimensions printed on this plan. Film a room to get real sizes.");
@@ -370,8 +374,8 @@ function renderAnswers() {
   }
   // ceilings: only a video can tell
   const sc = Object.entries(S.scans).find(([, s]) => s.model.scan?.ceiling_ft);
-  if (sc) { const c = sc[1].model.scan.ceiling_ft, r = planRoom(sc[0]);
-    setTile("t-ceil", c.low >= 8 ? "ok" : c.high < 8 ? "bad" : "warn", `≈ ${f1(c.best)} ft`, `measured in ${r?.label || "your video"} (likely ${f1(c.low)}–${f1(c.high)} ft)`); }
+  if (sc) { const c = sc[1].model.scan.ceiling_ft, r = planRoom(sc[0]);   // a measurement only, not a bedroom rule
+    setTile("t-ceil", "none", `≈ ${f1(c.best)} ft`, `measured in ${r?.label || "your video"} (likely ${f1(c.low)}–${f1(c.high)} ft)`); }
   else setTile("t-ceil", "none", "Not on the plan", "Floor plans never show it. Film a room to measure it.");
 }
 function renderVideoAnswers() {                // no floor plan: answer what one filmed room can answer
@@ -382,15 +386,11 @@ function renderVideoAnswers() {                // no floor plan: answer what one
   setTile("t-beds", "none", "Needs the floor plan", "Start over with the listing's floor plan to check how many legal bedrooms it really has.");
   setTile("t-area", "none", r.area_sqft != null ? `≈ ${n0(r.area_sqft)} sq ft` : "—",
           r.area_range_sqft ? `this room · likely ${n0(r.area_range_sqft[0])}–${n0(r.area_range_sqft[1])} sq ft` : "this room");
-  if (c) setTile("t-ceil", c.low >= 8 ? "ok" : c.high < 8 ? "bad" : "warn", `≈ ${f1(c.best)} ft`, `likely ${f1(c.low)}–${f1(c.high)} ft · NYC bedrooms need 8 ft`);
+  if (c) setTile("t-ceil", "none", `≈ ${f1(c.best)} ft`, `likely ${f1(c.low)}–${f1(c.high)} ft`);
   else setTile("t-ceil", "none", "Not visible", "Film the floor and ceiling to measure it.");
 }
-function ceilingOf(id) { return S.scans[id]?.model.scan?.ceiling_ft || null; }
-function effLegal(b) {                        // backend verdict, plus the ceiling check once a video measured it
-  if (b.legal === false) return false;
-  const c = ceilingOf(b.room);
-  if (c && c.high < 8) return false;
-  return b.legal === true ? true : null;
+function effLegal(b) {                        // backend verdict (bedroom rules: size + width only)
+  return b.legal === true ? true : b.legal === false ? false : null;
 }
 
 // ================= rooms =================
@@ -423,18 +423,14 @@ function bedChip(b) {
   return v === true ? chip("ok", "LEGAL BEDROOM") : v === false ? chip("bad", "NOT A LEGAL BEDROOM") : chip("warn", "NOT CONFIRMED YET");
 }
 function bedroomSection(b, r) {
-  const c = b.checks || {}, ms = b.measurements || {}, ceil = ceilingOf(r.id);
+  const c = b.checks || {}, ms = b.measurements || {};
   const mark = (v) => v === true ? `<span class="y">✓</span>` : v === false ? `<span class="n">✗</span>` : `<span class="q">?</span>`;
   const bool = (v) => v === true ? true : v === false ? false : null;
   const sq = ms.printed_sqft ?? ms.geometry_sqft ?? r.area_sqft;
   const width = r.printed_dims_ft ? Math.min(...r.printed_dims_ft) : r.dims_ft ? Math.min(r.dims_ft.w?.best ?? Infinity, r.dims_ft.d?.best ?? Infinity) : null;
-  const win = c.exterior_window === true ? "yes" : c.exterior_window === false ? "none found" : "can't tell from plan";
-  const ceilOk = ceil ? (ceil.low >= 8 ? true : ceil.high < 8 ? false : null) : null;
   return `<div class="sec"><h4>${S.videoOnly ? "Could this be a legal bedroom?" : "NYC legal bedroom?"}</h4><div class="chk">
       ${mark(bool(c.area_ge_80))}<span>At least 80 sq ft</span><span class="v">${sq != null ? n0(sq) + " sq ft" : "—"}</span>
       ${mark(bool(c.min_width_ge_8ft))}<span>At least 8 ft wide</span><span class="v">${width != null ? f1(width) + " ft" : "—"}</span>
-      ${mark(bool(c.exterior_window))}<span>Window to the outside</span><span class="v">${win}</span>
-      ${mark(ceilOk)}<span>Ceiling at least 8 ft</span><span class="v">${ceil ? `≈ ${f1(ceil.best)} ft` : "film the room ↓"}</span>
     </div>${b.legal === false && b.reason ? `<div class="note">${esc(b.reason)}</div>` : ""}</div>`;
 }
 function measureSection(r, scan) {
@@ -690,7 +686,7 @@ async function toWav(blob) {                  // browser recordings are webm/ogg
 }
 </script>
 <!-- ?v= stamps make browsers fetch the current 3D modules instead of a cached older copy -->
-<script type="module" src="three3d.js?v=1640"></script>
+<script type="module" src="three3d.js?v=1641"></script>
 <script type="module" src="cad3d.js?v=1640"></script>
 <script>
 document.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => {

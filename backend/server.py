@@ -466,11 +466,11 @@ def _pipeline(model, path, img, publish):
     # provisional answer from unverified geometry: what a timeout during verify returns
     prov = copy.deepcopy(model)
     _assemble(prov, parsed, geo, _stub_verify(img, parsed, geo))
-    _solve(prov, parsed, verify_ran=False)
+    _solve(prov, parsed)
     publish(prov)
     ver = _with_fallback(model, "verify", VERIFY_FN, VERIFY_WHY, _stub_verify, img, parsed, geo)
     _assemble(model, parsed, geo, ver)
-    _solve(model, parsed, verify_ran=not any(s["stage"] == "verify" for s in model["stubs_used"]))
+    _solve(model, parsed)
     publish(model)
 
 
@@ -571,9 +571,8 @@ def _room_out(r, scale):
             "method": r.get("method")}
 
 
-def _solve(model, parsed, verify_ran):
-    """Each solver runs on its own: one failing never blocks the others.
-    verify_ran=False (stub / provisional snapshot): windows are Carbon's unchecked guesses -> neutral headline."""
+def _solve(model, parsed):
+    """Each solver runs on its own: one failing never blocks the others."""
     rooms, doors, scale, ans = model["rooms"], model["doors"], model["scale_px_per_ft"], model["answers"]
     area = _run(model, "solvers.compute_area", solvers.compute_area, rooms, scale) or {}
     claim = (parsed.get("listing_claim") or {}).get("sqft")
@@ -589,7 +588,7 @@ def _solve(model, parsed, verify_ran):
     ans["clear_path"] = _path_summary(paths) if paths is not None else None
     ans["king_bed_fits"] = _run(model, "solvers.king_bed_fits", _king_bed, rooms, doors, scale)
     ans["bedroom_count"] = _run(model, "solvers.headline", _bedroom_headline,
-                                ans["legal_bedrooms"], rooms, parsed.get("listing_claim"), verify_ran)
+                                ans["legal_bedrooms"], rooms, parsed.get("listing_claim"))
 
 
 def _king_bed(rooms, doors, scale):
@@ -613,17 +612,17 @@ def _path_summary(per_room):
             "per_room": per_room}
 
 
-def _bedroom_headline(legal, rooms, claim, verify_ran):
-    """'Listed 2BR → legally 1BR + home office' ONLY if verify really ran (windows checked by Decisions)
-    and every bedroom's verdict is trustworthy: judged (legal not None) AND measured from printed dims
-    or traced-and-verified. Otherwise a neutral line that states sizes and makes no legal claim."""
+def _bedroom_headline(legal, rooms, claim):
+    """'Listed 2BR → legally 1BR + home office' ONLY if every bedroom's verdict is trustworthy: judged
+    (legal not None) AND measured from printed dims or traced-and-verified. Otherwise a neutral line that
+    states sizes and makes no legal claim. (Rules are size + width only, so no window / verify gate.)"""
     by_id = {r["id"]: r for r in rooms}
     listed = (claim or {}).get("bedrooms")
     trusted = [b for b in legal if b["legal"] is not None and (
         b.get("measurement_source") == "printed" or by_id.get(b["room"], {}).get("verified") is True)]
     out = {"listed": listed, "labelled": len(legal), "legal": None, "not_legal": None,
            "not_judged": len(legal) - len(trusted)}
-    if verify_ran and legal and len(trusted) == len(legal):
+    if legal and len(trusted) == len(legal):
         n_ok, n_bad = sum(b["legal"] is True for b in legal), sum(b["legal"] is False for b in legal)
         head = (f"Listed {listed}BR" if listed is not None else f"Plan shows {len(legal)}BR") + f" → legally {n_ok}BR"
         if n_bad:
@@ -796,8 +795,9 @@ def _scan_solve(model):
 def _legal_interval(rooms, windows, scale):
     """Legal-bedroom check on measured RANGES (method video_scan), conservative both ways:
     legal=False only if even the HIGH end fails (hi_w*hi_d < 80 or min(hi_w, hi_d) < 8);
-    legal=True only if even the LOW end passes (lo_w*lo_d >= 80, min(lo_w, lo_d) >= 8) AND an exterior window is
-    confirmed; otherwise None. Rooms from another method (none today) go through the normal plan solver.
+    legal=True only if even the LOW end passes (lo_w*lo_d >= 80, min(lo_w, lo_d) >= 8); otherwise None.
+    Size and width are the only bedroom rules (no window / ceiling check). Rooms from another method (none
+    today) go through the normal plan solver.
     Candidates: rooms labelled as bedrooms; if none is, every scanned room (scan.py films ONE room and labels it
     "Scanned room": the filmed room IS the bedroom in question)."""
     out = []
@@ -809,9 +809,7 @@ def _legal_interval(rooms, windows, scale):
         if r.get("method") != "video_scan":
             out += solvers.legal_bedrooms([r], windows, scale)
             continue
-        win = solvers._has_exterior_window(solvers._poly(r), windows, scale)
-        checks = {"area_ge_80": None, "min_width_ge_8ft": None, "exterior_window": win,
-                  "ceiling_height": "not_checkable_from_plan"}
+        checks = {"area_ge_80": None, "min_width_ge_8ft": None}
         rng, entry = r.get("dims_ft"), {"room": r["id"], "label": r.get("label"), "measurement_source": "video_range",
                                         "judged_as": judged_as}
         if not rng:
@@ -830,10 +828,7 @@ def _legal_interval(rooms, windows, scale):
                 f"at most {hi_a:.0f} sq ft < {solvers.MIN_BEDROOM_SQFT} sq ft minimum" if hi_a < solvers.MIN_BEDROOM_SQFT else "",
                 f"at most {hi_m:.1f} ft wide < {solvers.MIN_BEDROOM_WIDTH_FT} ft minimum" if hi_m < solvers.MIN_BEDROOM_WIDTH_FT else "") if s)
         elif lo_a >= solvers.MIN_BEDROOM_SQFT and lo_m >= solvers.MIN_BEDROOM_WIDTH_FT:
-            legal = True if win is True else None
-            reason = (f"at least {lo_a:.0f} sq ft and {lo_m:.1f} ft wide, exterior window "
-                      "(ceiling height not checkable from plan)") if win is True else (
-                f"size passes even at the low end, but {solvers.WINDOW_MSG.get(win, 'exterior window not confirmed')}")
+            legal, reason = True, f"at least {lo_a:.0f} sq ft and {lo_m:.1f} ft wide, even at the low end of the range"
         else:
             legal, reason = None, SCAN_RANGE_TOO_WIDE
         out.append({**entry, "legal": legal, "checks": checks, "reason": reason,

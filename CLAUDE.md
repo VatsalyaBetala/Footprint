@@ -76,8 +76,7 @@ single-Carbon-call baseline.
     "king_bed_fits": {"room": "r1", "fits": false, "reason": "..."},
     "clear_path": {"ok": true, "from": "r1", "to": "entrance"},
     "legal_bedrooms": [{"room": "r2", "legal": false,
-      "checks": {"area_ge_80": false, "min_width_ge_8ft": true, "exterior_window": true,
-                 "ceiling_height": "not_checkable_from_plan"},
+      "checks": {"area_ge_80": false, "min_width_ge_8ft": true},
       "reason": "71 sq ft < 80 sq ft minimum"}],
     "custom_query": null
   },
@@ -124,9 +123,8 @@ null when there is no claim. Never call area overstated unless claim_scope = "sa
 
 ## Impact upgrades (priority order)
 1. Legal bedroom check (solvers.py, deterministic): every room labeled bedroom must have
-   area >= 80 sq ft, min clear width >= 8 ft (shapely: shortest side of minimum rotated rectangle),
-   and a window on an exterior wall (Carbon detects windows; Decisions verifies "on exterior wall").
-   Ceiling height can't be read from a plan → report "not_checkable_from_plan", never guess.
+   area >= 80 sq ft and min clear width >= 8 ft (shapely: shortest side of minimum rotated rectangle).
+   Those two are the only bedroom rules: window and ceiling height are NOT checked (removed Nov 21).
    Headline output: "Listed 2BR → legally 1BR + home office".
 2. Voice query: judge speaks "will a 7-foot sofa fit in the living room?" → audio to HYDROGEN →
    JSON {object, w_ft, d_ft, clearance_ft, room} → same fit solver → drawn on plan + 3D.

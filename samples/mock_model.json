@@ -297,7 +297,7 @@
   "king_bed_fits": {
    "room": "r6",
    "fits": false,
-   "reason": "King bed 6.3\u00d76.7 ft + 3 ft clearance on 3 sides needs 12.3\u00d79.7 ft; room is 7.9\u00d79.0 ft"
+   "reason": "King bed 6.3×6.7 ft + 3 ft clearance on 3 sides needs 12.3×9.7 ft; room is 7.9×9.0 ft"
   },
   "clear_path": [
    {
@@ -363,22 +363,18 @@
     "legal": true,
     "checks": {
      "area_ge_80": true,
-     "min_width_ge_8ft": true,
-     "exterior_window": true,
-     "ceiling_height": "not_checkable_from_plan"
+     "min_width_ge_8ft": true
     },
-    "reason": "176 sq ft, 13.0 ft narrowest width, window on exterior wall"
+    "reason": "176 sq ft, 13.0 ft narrowest width"
    },
    {
     "room": "r6",
     "legal": false,
     "checks": {
      "area_ge_80": false,
-     "min_width_ge_8ft": false,
-     "exterior_window": false,
-     "ceiling_height": "not_checkable_from_plan"
+     "min_width_ge_8ft": false
     },
-    "reason": "71 sq ft < 80 sq ft minimum; 7.9 ft narrowest width < 8 ft; no window on an exterior wall"
+    "reason": "71 sq ft < 80 sq ft minimum; 7.9 ft narrowest width < 8 ft"
    }
   ],
   "custom_query": null

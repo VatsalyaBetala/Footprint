@@ -360,22 +360,18 @@
     "legal": null,
     "checks": {
      "area_ge_80": null,
-     "min_width_ge_8ft": null,
-     "exterior_window": true,
-     "ceiling_height": "not_checkable_from_plan"
+     "min_width_ge_8ft": null
     },
     "reason": "Scale unknown, no dimensions printed: area and width can't be checked"
    },
    {
     "room": "r6",
-    "legal": false,
+    "legal": null,
     "checks": {
      "area_ge_80": null,
-     "min_width_ge_8ft": null,
-     "exterior_window": false,
-     "ceiling_height": "not_checkable_from_plan"
+     "min_width_ge_8ft": null
     },
-    "reason": "No window on an exterior wall (area and width unknown: no scale)"
+    "reason": "Scale unknown, no dimensions printed: area and width can't be checked"
    }
   ],
   "custom_query": null

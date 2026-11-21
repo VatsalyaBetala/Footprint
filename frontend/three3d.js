@@ -486,8 +486,8 @@ function captionText(r) {
   const parts = [r.label.toUpperCase()];
   parts.push(r.area_sqft == null ? "size unknown" : `${Math.round(r.area_sqft)} sq ft`);
   if (legal) {
-    if (legal.checks?.exterior_window === false) parts.push("no exterior window");
-    if (legal.checks?.min_width_ge_8ft === false && legal.checks?.exterior_window !== false) parts.push("under 8 ft wide");
+    if (legal.checks?.area_ge_80 === false) parts.push("under 80 sq ft");
+    if (legal.checks?.min_width_ge_8ft === false) parts.push("under 8 ft wide");
     parts.push(legal.legal === false ? "not a legal bedroom" : legal.legal === true ? "legal bedroom" : "legal status unconfirmed");
   } else {
     parts.push(r.verified ? "verified" : "unverified");

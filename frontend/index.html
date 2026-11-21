@@ -46,6 +46,7 @@ button, input, select { font: inherit; color: inherit; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-height: 48px; }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--accent); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.rec { background: var(--bad); border-color: var(--bad); color: #fff; animation: blink 1.2s infinite; }
 .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* cards & layout */
@@ -191,6 +192,8 @@ td.best { color: var(--sys); font-weight: 600; }
 .view3d-caption { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; background: rgba(15,23,42,.88);
                   color: #fff; padding: 8px 16px; border-radius: 8px; font: 600 13px var(--mono); letter-spacing: .03em; white-space: nowrap;
                   max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+.view3d-notice { position: absolute; top: 12px; left: 12px; z-index: 2; background: color-mix(in srgb, var(--warn) 12%, white); color: var(--warn-ink);
+                 border: 1px solid var(--warn); border-radius: 9999px; padding: 4px 12px; font: 600 11px var(--mono); letter-spacing: .03em; }
 .view3d-caption.fail { background: color-mix(in srgb, var(--bad) 85%, black); }
 
 /* tab bar */
@@ -294,6 +297,7 @@ td.best { color: var(--sys); font-weight: 600; }
           <label class="field"><span class="label">Room</span><select id="fit-room"></select></label>
         </div>
         <button class="btn primary" id="fit-go">Check fit</button>
+        <button class="btn" id="fit-voice" hidden title="Try: “Will a 7-foot sofa fit in the living room?”">🎤 Ask by voice</button>
         <button class="btn" id="fit-sample" hidden>Analyze sample plan (live backend)</button>
         <div id="fit-out"></div>
       </div>
@@ -328,7 +332,8 @@ const API = params.get("api") || "http://localhost:8000";
 const MOCKS = { ok: ["../samples/mock_model.json", "mock_plan.svg"],
                 noscale: ["../samples/mock_model_noscale.json", "mock_plan_nodims.svg"] };
 const SAMPLE_PLAN = "../samples/synthetic_2br.png";
-const RESULTS = ["../eval/results.json", "../samples/mock_results.json"];
+// TEST results first; DEV results while the TEST run is still going; mock only if neither exists.
+const RESULTS = ["../eval/results.json", "../eval/results_dev.json", "../samples/mock_results.json"];
 const STAGES = ["Reading plan…", "Tracing rooms…", "Verifying…", "Checking code…"];
 const PRESETS = [
   { name: "King bed", w: 6.33, d: 6.67, c: 3, h: 2 }, { name: "Queen bed", w: 5, d: 6.67, c: 3, h: 2 },
@@ -336,6 +341,7 @@ const PRESETS = [
 ];
 const NOT_INFO_FLAGS = new Set(["no_printed_dims", "no_scale"]); // informational, not warnings
 
+let lastError = null, verdictTimer = null; // why we fell back to the mock, shown to the user
 let model = null, imageUrl = null, isMock = false, timers = [], tab = "verify", built3d = null, fitResult = null;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -345,7 +351,19 @@ const chip = (cls, t) => `<span class="chip ${cls}">${esc(t)}</span>`;
 const room = (id) => model.rooms.find((r) => r.id === id || r.label === id);
 const rname = (id) => room(id)?.label || id;
 const noScale = () => model.scale_status === "undetermined" || model.scale_px_per_ft == null;
-const isBedroom = (r) => /bed/i.test(r.label);
+// Bedroom by label: English "Bedroom", "BR 2", "MBR"; Finnish "MH", "MH1", "makuuhuone" (CubiCasa plans).
+const BEDROOM_RE = /bed|makuuhuone|^\s*(m?br|mh)\s*\d*\s*$/i;
+const isBedroom = (r) => BEDROOM_RE.test(r?.label || "");
+// Every bedroom the plan labels, with the backend's legal verdict when it judged that room (else legal: null).
+function bedroomRows() {
+  const judged = model.answers?.legal_bedrooms || [];
+  const ids = new Set(judged.map((b) => b.room));
+  const unchecked = model.rooms.filter((r) => isBedroom(r) && !ids.has(r.id)).map((r) => ({
+    room: r.id, legal: null, unchecked: true, checks: {},
+    reason: `Labelled "${r.label}" (a bedroom), but the legal check didn't run on it.`,
+  }));
+  return [...judged, ...unchecked];
+}
 async function getJSON(url, opts) { const r = await fetch(url, opts); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }
 const withTimeout = (ms) => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal; };
 
@@ -356,7 +374,21 @@ async function loadMock(kind = "ok") {
   render();
 }
 
-async function analyze(file) {
+// Formats the server can decode (OpenCV). iPhone HEIC, PDF and SVG are not.
+const UNSUPPORTED = /\.(heic|heif|pdf|svg)$/i;
+function uploadError(msg) {
+  clearTimeout(verdictTimer); // a pending verdict animation must not overwrite the error
+  $("stages").hidden = true;
+  setVerdict("warn", "<em>Couldn't analyze</em> this plan", msg);
+  $("source-line").textContent = `Upload failed · ${msg}`;
+}
+
+// fallbackToMock: only for the automatic sample on page load. A user's own upload never turns into mock data.
+async function analyze(file, { fallbackToMock = false } = {}) {
+  if (UNSUPPORTED.test(file.name) || /heic|heif|pdf|svg/i.test(file.type)) {
+    return uploadError(`${file.name} is ${file.name.split(".").pop().toUpperCase()}; upload a PNG or JPG (screenshot the plan if needed).`);
+  }
+  const prevImage = imageUrl;
   imageUrl = URL.createObjectURL(file);
   $("stages").hidden = false;
   let i = 0;
@@ -367,11 +399,22 @@ async function analyze(file) {
   try {
     const form = new FormData();
     form.append("file", file); // server.py: multipart "file"
-    model = await getJSON(`${API}/analyze`, { method: "POST", body: form, signal: withTimeout(90000) });
-    isMock = false;
+    const res = await fetch(`${API}/analyze`, { method: "POST", body: form, signal: withTimeout(90000) });
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body?.rooms) {
+      const why = body?.errors?.map((e) => e.error).join("; ") || body?.error || `HTTP ${res.status}`;
+      throw new Error(res.status === 400 ? `the server couldn't read this image (${why})` : why);
+    }
+    model = body;
+    isMock = false; lastError = null;
     if (model.partial && model.model_id) pollFull(model.model_id);
   } catch (err) {
-    console.warn("analyze failed → mock", err);
+    clearInterval(iv);
+    const why = err.name === "AbortError" ? "no answer from the backend in 90 s"
+      : /Failed to fetch|NetworkError|Load failed/i.test(err.message) ? `backend not reachable at ${API}` : err.message;
+    console.warn("analyze failed", err);
+    if (!fallbackToMock) { imageUrl = prevImage; return uploadError(why); }
+    lastError = `analyze failed: ${why}`;
     const [m, img] = MOCKS.ok;
     model = await getJSON(m); imageUrl = img; isMock = true;
   }
@@ -393,7 +436,7 @@ async function pollFull(id) {
 }
 async function analyzeSample() {
   const blob = await (await fetch(SAMPLE_PLAN)).blob();
-  analyze(new File([blob], "synthetic_2br.png", { type: "image/png" }));
+  return analyze(new File([blob], "synthetic_2br.png", { type: "image/png" }), { fallbackToMock: !model });
 }
 
 // ---------------- render ----------------
@@ -401,7 +444,8 @@ function render() {
   timers.forEach(clearTimeout); timers = [];
   fitResult = null;
   $("mock-badge").hidden = !isMock;
-  $("source-line").textContent = isMock ? "Backend offline — showing mock data" : `Live · ${API}`;
+  $("source-line").textContent = !isMock ? `Live · ${API}`
+    : lastError ? `Mock data: ${lastError}` : "Mock data (backend not used)";
   drawPlan($("plan-verify"), { anim: true });
   drawPlan($("plan-2d"), { anim: false, paths: true });
   drawPlan($("plan-fit"), { anim: false });
@@ -486,8 +530,8 @@ function setVerdict(cls, text, sub) {
 }
 function renderVerdict() {
   const a = model.answers || {}, area = model.area || {};
-  const beds = a.legal_bedrooms || [];
-  const listed = model.listing_claim?.bedrooms ?? beds.length; // ⚠️ listed-bedroom count isn't in the contract yet
+  const beds = bedroomRows();
+  const listed = model.listing_claim?.bedrooms ?? beds.length; // printed claim, else bedrooms the plan labels
   const legal = beds.filter((b) => b.legal === true).length;
   const illegal = beds.filter((b) => b.legal === false);
   const unknown = beds.filter((b) => b.legal == null);
@@ -509,41 +553,45 @@ function renderVerdict() {
   } else if (a.king_bed_fits?.fits === false) {
     v = ["bad", `<em>A king bed doesn't fit</em> in ${esc(rname(a.king_bed_fits.room))}`, a.king_bed_fits.reason];
   } else {
-    v = ["ok", `<em>Checks out</em>: ${legal} legal bedroom${legal === 1 ? "" : "s"}`, unknown.length ? `${unknown.length} bedroom(s) unconfirmed.` : ""];
+    v = !beds.length && !listed ? ["warn", `<em>No bedrooms</em> on this plan`, "No room is labelled as a bedroom, so there's nothing to check for legal bedroom size."]
+      : unknown.length && !legal ? ["warn", `${beds.length} bedroom${beds.length === 1 ? "" : "s"} labelled · <em>legal status unconfirmed</em>`, unknown.map((b) => `${rname(b.room)}: ${b.reason}`).join(" · ")]
+      : ["ok", `<em>Checks out</em>: ${legal} legal bedroom${legal === 1 ? "" : "s"}`, unknown.length ? `${unknown.length} bedroom(s) unconfirmed.` : ""];
   }
   setVerdict("pending", "…", "");
-  timers.push(setTimeout(() => setVerdict(...v), 400 + (model.alignment_score_history?.length || 1) * 900));
+  clearTimeout(verdictTimer);
+  verdictTimer = setTimeout(() => setVerdict(...v), 400 + (model.alignment_score_history?.length || 1) * 900);
 }
 
 function renderPair() {
   const a = model.answers || {}, area = model.area || {};
-  const beds = a.legal_bedrooms || [];
+  const beds = bedroomRows();
   const listed = model.listing_claim?.bedrooms ?? beds.length;
   const legal = beds.filter((b) => b.legal === true).length;
   const unknown = beds.filter((b) => b.legal == null).length;
   const brText = unknown ? `${legal}–${legal + unknown}BR` : `${legal}BR`;
   const mismatch = legal + unknown < listed;
+  const none = !beds.length && !listed;
   const measured = noScale() ? null : (area.from_geometry ?? area.from_printed);
   const overstated = area.claim_scope === "same_floor" && area.listing_claim && measured && area.listing_claim > measured * 1.1;
   $("pair").innerHTML = `
     <div class="metric tint"><div class="head">${model.listing_claim?.bedrooms != null ? "Listing says" : "Plan labels"} ${chip("base", "CLAIM")}</div>
       <div class="big base">${listed}BR</div>
       <div class="cap mono">${area.listing_claim != null ? `${n0(area.listing_claim)} sq ft` : "no sq ft claimed"}</div></div>
-    <div class="metric"><div class="head">Footprint verified ${mismatch ? chip("bad", "MISMATCH") : unknown ? chip("warn", "UNCONFIRMED") : chip("ok", "MATCH")}</div>
-      <div class="big ${mismatch ? "bad" : unknown ? "" : "ok"}">${brText}</div>
+    <div class="metric"><div class="head">Footprint verified ${none ? chip("", "NO BEDROOMS") : mismatch ? chip("bad", "MISMATCH") : unknown ? chip("warn", "UNCONFIRMED") : chip("ok", "MATCH")}</div>
+      <div class="big ${none ? "" : mismatch ? "bad" : unknown ? "" : "ok"}">${brText}</div>
       <div class="cap mono">${measured != null ? `${n0(measured)} sq ft${overstated ? " · claim overstated" : ""}` : "scale unknown"}${unknown ? ` · ${unknown} unconfirmed` : ""}</div></div>`;
 }
 
 // ---------------- legal bedrooms ----------------
 function renderLegal() {
-  const beds = model.answers?.legal_bedrooms || [];
+  const beds = bedroomRows();
   const fmtVal = { area_ge_80: (r) => r?.area_sqft != null ? `${Math.round(r.area_sqft)} sq ft` : "no scale",
                    min_width_ge_8ft: (r) => r?.printed_dims_ft ? `${Math.min(...r.printed_dims_ft).toFixed(1)} ft` : noScale() ? "no scale" : "",
                    exterior_window: () => "", ceiling_height: () => "" };
   const name = { area_ge_80: "Area ≥ 80 sq ft", min_width_ge_8ft: "Width ≥ 8 ft", exterior_window: "Window on exterior wall", ceiling_height: "Ceiling height" };
   $("legal").innerHTML = beds.length ? beds.map((b) => {
     const r = room(b.room), cls = b.legal === true ? "" : b.legal === false ? "bad" : "unknown";
-    const c = b.legal === true ? chip("ok", "LEGAL") : b.legal === false ? chip("bad", "NOT LEGAL") : chip("warn", "CAN'T CONFIRM");
+    const c = b.legal === true ? chip("ok", "LEGAL") : b.legal === false ? chip("bad", "NOT LEGAL") : chip("warn", b.unchecked ? "NOT CHECKED" : "CAN'T CONFIRM");
     const rows = Object.entries(b.checks || {}).map(([k, v]) => {
       const ic = v === true ? ["y", "✓"] : v === false ? ["n", "✗"] : ["q", "?"];
       const val = typeof v === "string" ? "not checkable" : v == null ? "not checkable" : (fmtVal[k]?.(r) || "");
@@ -633,6 +681,7 @@ function renderFit() {
   $("fit-room").innerHTML = model.rooms.map((r) => `<option value="${esc(r.id)}">${esc(r.label)}</option>`).join("");
   $("fit-room").value = room(cur) ? cur : model.rooms.find(isBedroom)?.id || model.rooms[0]?.id;
   if (!$("fit-w").value) applyPreset();
+  $("fit-voice").hidden = !(on && canVoice() && !voiceMissing);
   if (!fitResult) $("fit-out").innerHTML = off ? chip("warn", "CAN'T MEASURE: NO SCALE ON THIS PLAN")
     : on ? "" : chip("warn", "NEEDS A LIVE MODEL");
 }
@@ -705,12 +754,96 @@ function show3dFurniture() {
   const b = fitResult && fitBox(), s = model.scale_px_per_ft;
   if (!b || !s || !window.Footprint3D) return;
   try {
-    window.Footprint3D.showFurniture({ room: fitResult.room, fits: fitResult.fits, rotation_deg: 0, h_ft: fitResult.h_ft,
+    const kind = /bed/i.test(fitResult.name) ? "bed" : /sofa/i.test(fitResult.name) ? "sofa" : "box";
+    window.Footprint3D.showFurniture({ room: fitResult.room, fits: fitResult.fits, rotation_deg: 0, h_ft: fitResult.h_ft, kind, clearance_ft: fitResult.c_ft,
       w_ft: (b.x1 - b.x0) / s, d_ft: (b.y1 - b.y0) / s, center_px: [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2] });
   } catch (e) { console.warn("3D furniture failed", e); }
 }
 $("fit-go").onclick = checkFit;
 $("fit-sample").onclick = analyzeSample;
+
+// ---------------- voice ----------------
+// Mic → MediaRecorder → re-encoded to 16 kHz mono WAV (Gemini's documented audio list doesn't include webm)
+// → POST /voice {model_id, audio} → Hydrogen parses the intent → the same solver as /query.
+let rec = null, voiceMissing = false;
+const canVoice = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+function voiceBtn(recording) {
+  $("fit-voice").classList.toggle("rec", recording);
+  $("fit-voice").textContent = recording ? "■ Stop · listening…" : "🎤 Ask by voice";
+}
+async function toggleVoice() {
+  if (rec) { rec.stop(); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (err) {
+    $("fit-out").innerHTML = `${chip("warn", "MIC BLOCKED")}<div class="reason" style="margin-top:8px">Allow microphone access for this page, or type the size instead.</div>`;
+    return;
+  }
+  const chunks = [], r = new MediaRecorder(stream);
+  rec = r;
+  r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  r.onstop = () => {
+    clearTimeout(r.cap); stream.getTracks().forEach((t) => t.stop());
+    rec = null; voiceBtn(false);
+    sendVoice(new Blob(chunks, { type: chunks[0]?.type || r.mimeType || "audio/webm" }));
+  };
+  r.start();
+  r.cap = setTimeout(() => r.state === "recording" && r.stop(), 8000); // hard cap: 8 s
+  voiceBtn(true);
+  $("fit-out").innerHTML = `<span class="reason">Listening… ask e.g. “Will a 7-foot sofa fit in the living room?” then press Stop.</span>`;
+}
+async function toWav(blob) {
+  const ctx = new AudioContext();
+  const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+  ctx.close();
+  const rate = 16000, off = new OfflineAudioContext(1, Math.max(1, Math.ceil(audio.duration * rate)), rate);
+  const src = off.createBufferSource();
+  src.buffer = audio; src.connect(off.destination); src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const v = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+  const str = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, "RIFF"); v.setUint32(4, 36 + pcm.length * 2, true); str(8, "WAVE"); str(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true);
+  v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data");
+  v.setUint32(40, pcm.length * 2, true);
+  pcm.forEach((s, i) => v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 0x7fff, true));
+  return new Blob([v], { type: "audio/wav" });
+}
+async function sendVoice(blob) {
+  $("fit-out").innerHTML = `<span class="reason">Understanding your question…</span>`;
+  $("fit-voice").disabled = true;
+  try {
+    let wav = null;
+    try { wav = await toWav(blob); } catch (e) { console.warn("WAV re-encode failed, sending original", e); }
+    const form = new FormData();
+    form.append("model_id", model.model_id);
+    form.append("audio", wav || blob, wav ? "question.wav" : "question.webm");
+    const res = await fetch(`${API}/voice`, { method: "POST", body: form, signal: withTimeout(30000) });
+    const d = await res.json().catch(() => ({}));
+    if (res.status === 404 && d.detail === "Not Found") { // route missing on this server → hide the mic
+      voiceMissing = true; $("fit-voice").hidden = true;
+      throw new Error("this server has no /voice endpoint");
+    }
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    const q = d.parsed_query || {}, heard = d.transcript_guess;
+    if (!d.fit) throw new Error((d.errors || []).map((e) => e.error).join(" · ") || "couldn't understand the question");
+    if (q.w_ft) $("fit-w").value = q.w_ft;
+    if (q.d_ft) $("fit-d").value = q.d_ft;
+    if (q.clearance_ft != null) $("fit-c").value = q.clearance_ft;
+    if (d.room) $("fit-room").value = d.room;
+    const obj = q.object || "your item";
+    fitResult = { room: d.room, label: d.label || rname(d.room), w_ft: q.w_ft, d_ft: q.d_ft, c_ft: q.clearance_ft,
+                  h_ft: /sofa|couch/.test(obj) ? 2.8 : /bed/.test(obj) ? 2 : 2.5, name: obj[0].toUpperCase() + obj.slice(1),
+                  fits: d.fit.fits ?? null, reason: d.fit.reason || "", placement: d.fit.placement || null,
+                  paths: clearPaths(d.path), errors: d.errors || [] };
+    showFitResult();
+    $("fit-out").insertAdjacentHTML("afterbegin", `<div class="reason" style="margin-bottom:8px">🎤 ${heard ? `Heard: “${esc(heard)}”` : "Voice question"}${
+      d.cost_usd != null ? ` · $${(+d.cost_usd).toFixed(4)}` : ""}${d.timings_ms?.hydrogen ? ` · ${(d.timings_ms.hydrogen / 1000).toFixed(1)} s` : ""}</div>`);
+  } catch (err) {
+    $("fit-out").innerHTML = `${chip("warn", "VOICE: NOT CHECKED")}<div class="reason" style="margin-top:8px">${esc(err.message)}. Type the size instead; fit is only computed by the solver.</div>`;
+  } finally { $("fit-voice").disabled = false; }
+}
+$("fit-voice").onclick = toggleVoice;
 
 // ---------------- proof / eval ----------------
 const SYS_ORDER = ["B0", "B1", "B2", "v1", "v2"];
@@ -730,7 +863,7 @@ async function loadProof() {
   const curve = res.coverage_curve || {};
   const html = [];
   if (res.placeholder) html.push(`<div class="placeholder-banner">PLACEHOLDER: not real results. Run eval/run_eval.py to replace (${esc(src)}).</div>`);
-  html.push(`<div class="section-head" style="margin:0"><span class="chip info">n = ${res.n_test} CubiCasa5K test plans · seed ${res.seed}</span>
+  html.push(`<div class="section-head" style="margin:0"><span class="chip info">n = ${res.n_test} CubiCasa5K ${res.split === "dev" ? "DEV (tuning set, not the test set)" : "test"} plans · seed ${res.seed}</span>
     <span class="chip">${esc(src.split("/").pop())}</span></div>`);
   html.push(`<div class="grid2">
     <div class="metric"><div class="head">${esc(res.systems?.[best]?.name || "Footprint")} ${chip("ok", "✓")}</div>
@@ -813,10 +946,16 @@ $("file").addEventListener("change", (e) => e.target.files[0] && analyze(e.targe
 
 (async () => {
   const m = params.get("mock");
-  if (m) await loadMock(m === "noscale" ? "noscale" : "ok");
-  else try { await getJSON(`${API}/health`, { signal: withTimeout(2000) }); $("source-line").textContent = `Backend live · ${API}: upload a plan`; }
-  catch {} finally { await loadMock("ok"); } // something always renders; uploading replaces it with a live result
   if (params.get("tab")) go(params.get("tab"));
+  if (m) { await loadMock(m === "noscale" ? "noscale" : "ok"); return; }
+  let live = false;
+  if (location.protocol === "file:") lastError = "page opened as a file; serve it (python3 -m http.server 5500) and open http://localhost:5500/frontend/";
+  try { await getJSON(`${API}/health`, { signal: withTimeout(6000) }); live = true; }
+  catch (err) { lastError = lastError || `backend not reachable at ${API} (${err.name === "AbortError" ? "no answer in 6 s" : err.message})`; }
+  // Backend up → open on a REAL result for the bundled sample plan (server caches it by image hash, so it's
+  // instant after the first run). Backend down → mock, clearly badged. analyze() itself falls back to the mock.
+  if (live) await analyzeSample();
+  else await loadMock("ok");
 })();
 </script>
 <script type="module" src="three3d.js"></script>

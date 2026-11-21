@@ -4,960 +4,730 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Footprint</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-/* Blueprint Precision tokens. three3d.js reads --panel --line --ok --bad --warn --accent. */
 :root {
-  --bg: #f8f9fa; --panel: #ffffff; --ink: #0f172a; --muted: #475569; --line: #e2e8f0; --line-strong: #cbd5e1;
-  --accent: #2563eb; --accent-tint: #eaedff; --accent-ink: #003ea8;
-  --ok: #10b981; --ok-ink: #047857; --warn: #f59e0b; --warn-ink: #b45309; --bad: #ef4444; --bad-ink: #b91c1c;
-  --sys: #006c49; --base: #ffb95f; --base-ink: #784b00; --base-tint: #f2f3ff;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --float: 0 4px 16px rgba(15, 23, 42, .06);
+  --bg: #f5f6f8; --panel: #ffffff; --ink: #0f172a; --muted: #5b6577; --line: #e3e7ee; --line-strong: #cbd3df;
+  --accent: #2563eb; --accent-tint: #eaf0ff; --accent-ink: #1d4ed8;
+  --ok: #10b981; --ok-ink: #047857; --ok-tint: #e7f8f1; --warn: #f59e0b; --warn-ink: #b45309; --warn-tint: #fff5e1;
+  --bad: #ef4444; --bad-ink: #b91c1c; --bad-tint: #fdecec;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; --sans: "Inter", -apple-system, system-ui, sans-serif;
+  --float: 0 4px 18px rgba(15, 23, 42, .07);
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 400 14px/20px var(--sans); padding-bottom: 88px; }
-.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-button, input, select { font: inherit; color: inherit; }
-.app { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
-
-/* header */
-.top { display: flex; align-items: center; gap: 10px; padding: 16px 0; position: sticky; top: 0; z-index: 5;
-       background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); }
-.logo { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
-        display: grid; place-items: center; }
-.title { font-weight: 600; font-size: 20px; letter-spacing: -.01em; }
-.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 9999px;
-        font: 500 11px/14px var(--mono); letter-spacing: .03em; border: 1px solid transparent; white-space: nowrap; }
-.chip.nyc { background: var(--accent-tint); color: var(--accent-ink); border-radius: 6px; padding: 0 6px; }
-.chip.ok { background: color-mix(in srgb, var(--ok) 10%, white); color: var(--ok-ink); border-color: color-mix(in srgb, var(--ok) 40%, white); }
-.chip.warn { background: color-mix(in srgb, var(--warn) 10%, white); color: var(--warn-ink); border-color: color-mix(in srgb, var(--warn) 45%, white); }
-.chip.bad { background: color-mix(in srgb, var(--bad) 10%, white); color: var(--bad-ink); border-color: color-mix(in srgb, var(--bad) 40%, white); }
-.chip.info { background: var(--accent-tint); color: var(--accent-ink); }
-.chip.base { background: color-mix(in srgb, var(--base) 35%, white); color: var(--base-ink); }
-.spacer { flex: 1; }
-
-/* buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px;
-       border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-weight: 600; cursor: pointer; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-height: 48px; }
-.btn.ghost { border-color: transparent; background: transparent; color: var(--accent); }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn.rec { background: var(--bad); border-color: var(--bad); color: #fff; animation: blink 1.2s infinite; }
-.btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-/* cards & layout */
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
-.card h2 { margin: 0; font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -.005em; }
-.card .sub { color: var(--muted); font-size: 13px; line-height: 18px; margin-top: 2px; }
-.label { font: 600 12px/16px var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-.stack { display: flex; flex-direction: column; gap: 16px; }
-.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-.metric .head { flex-wrap: wrap; gap: 6px; }
-body { overflow-x: hidden; } .reason, .verdict-text { overflow-wrap: anywhere; }
-.cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 -4px; }
-.section-head h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
-[data-tab] { display: none; }
-[data-tab].active { display: block; }
-
-/* verdict */
-.verdict { border-left: 3px solid var(--bad); }
-.verdict.ok { border-left-color: var(--ok); } .verdict.warn { border-left-color: var(--warn); } .verdict.pending { border-left-color: var(--line-strong); }
-.verdict-text { font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -.015em; margin: 6px 0 4px; }
-.verdict-text em { font-style: normal; color: var(--bad-ink); }
-.verdict.ok .verdict-text em { color: var(--ok-ink); } .verdict.warn .verdict-text em { color: var(--warn-ink); }
-
-/* metric pair (claimed vs verified) */
-.metric { border-radius: 12px; padding: 16px; border: 1px solid var(--line); background: var(--panel); }
-.metric.tint { background: var(--base-tint); border-color: transparent; }
-.metric .big { font: 600 32px/38px var(--mono); letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin: 8px 0 2px; }
-.metric .big.ok { color: var(--sys); } .metric .big.bad { color: var(--bad-ink); } .metric .big.base { color: var(--base-ink); }
-.metric .cap { color: var(--muted); }
-.metric .head { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
-
-/* upload & progress */
-.upload { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.stages { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-.stage { font: 500 11px/14px var(--mono); padding: 5px 10px; border-radius: 9999px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
-.stage.on { background: var(--accent-tint); color: var(--accent-ink); border-color: transparent; }
-.stage.done { color: var(--ok-ink); }
-.stage.on::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
-@keyframes blink { 50% { opacity: .2; } }
-
-/* plan canvas */
-.canvas { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow: hidden;
-          background: var(--panel) radial-gradient(var(--line) 1px, transparent 1px) 0 0 / 16px 16px; }
-.canvas svg { width: 100%; height: auto; display: block; }
-.room { fill-opacity: .18; stroke-width: 3; cursor: pointer; opacity: 0; animation: pop .4s forwards; transition: fill-opacity .15s; }
-.room.hl, .room:hover { fill-opacity: .4; }
-.room.ok { fill: var(--ok); stroke: var(--ok); }
-.room.flag { fill: var(--warn); stroke: var(--warn); }
-.room.unverified { fill: var(--warn); stroke: var(--warn); stroke-dasharray: 9 6; fill-opacity: .1; }
-.room.fail { fill: var(--bad); stroke: var(--bad); }
-@keyframes pop { to { opacity: 1; } }
-.rlabel { font: 600 13px var(--sans); fill: var(--ink); pointer-events: none; opacity: 0; animation: pop .4s forwards; }
-.lbl-bg { fill: #fff; stroke: var(--ok); stroke-width: 1.5; }
-.lbl-bg.fail { stroke: var(--bad); } .lbl-bg.flag, .lbl-bg.unverified { stroke: var(--warn); stroke-dasharray: 4 3; }
-.rlabel .m { font: 600 12px var(--mono); }
-.rlabel .u { fill: var(--warn-ink); font: 600 11px var(--mono); }
-.door { fill: var(--accent); stroke: #fff; stroke-width: 2; }
-.win { fill: #5a8fb5; }
-.entr { fill: none; stroke: var(--accent); stroke-width: 3; }
-.cpath { fill: none; stroke: var(--accent); stroke-width: 3; stroke-dasharray: 1 7; stroke-linecap: round; }
-.cpath.bad { stroke: var(--bad); }
-.fit-rect { stroke-width: 2.5; fill-opacity: .35; }
-.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 12px; }
-.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; border: 2px solid; }
-
-/* score */
-.score-row { display: flex; align-items: baseline; justify-content: space-between; }
-.score-num { font: 600 32px/38px var(--mono); letter-spacing: -.02em; }
-.bar { height: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 9999px; overflow: hidden; }
-.bar > div { height: 100%; width: 0; border-radius: 9999px; transition: width .7s ease; }
-.iters { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-
-/* rows */
-.rows > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
-.rows > div:first-child { border-top: 0; padding-top: 4px; }
-.rows .v { font: 500 16px/22px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
-.rows .k { color: var(--muted); }
-.rows [data-room] { cursor: pointer; }
-.room-row { border-left: 3px solid var(--ok); padding-left: 10px !important; margin-left: -2px; }
-.room-row.fail { border-left-color: var(--bad); } .room-row.flag, .room-row.unverified { border-left-color: var(--warn); }
-
-/* legal cards */
-.legal { border-left: 3px solid var(--ok); }
-.legal.bad { border-left-color: var(--bad); } .legal.unknown { border-left-color: var(--warn); }
-.checks { margin: 12px 0 8px; }
-.check { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
-.check .ic { font-weight: 700; text-align: center; }
-.check .ic.y { color: var(--ok-ink); } .check .ic.n { color: var(--bad-ink); } .check .ic.q { color: var(--warn-ink); }
-.check .v { font: 500 13px var(--mono); color: var(--muted); }
-.reason { color: var(--muted); font-size: 13px; line-height: 18px; }
-
-/* decisions */
-.dec-room { padding: 10px 0; border-top: 1px solid var(--line); }
-.dec-room:first-child { border-top: 0; padding-top: 0; }
-.dec-room .name { font-weight: 600; display: flex; justify-content: space-between; align-items: center; cursor: pointer; list-style: none; }
-.dec-room .name::-webkit-details-marker { display: none; }
-.dec-room[open] .name { margin-bottom: 6px; }
-.prob { display: grid; grid-template-columns: 1fr 48px; gap: 4px 10px; align-items: center; font-size: 13px; margin: 6px 0; color: var(--muted); }
-.prob b { font: 600 13px var(--mono); text-align: right; color: var(--ink); }
-.prob .bar { grid-column: 1 / -1; height: 5px; }
-
-/* benchmark bars (eval) */
-.bench { padding: 12px 0; }
-.bench .top-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
-.bench .top-line > span:first-child { font-size: 16px; }
-.bench .vals { font: 500 13px var(--mono); color: var(--muted); white-space: nowrap; }
-.bench .top-line > span:first-child { min-width: 0; }
-.bench .bar { height: 10px; border: 0; background: var(--accent-tint); margin-top: 6px; }
-.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: right; padding: 10px 8px; border-top: 1px solid var(--line); font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
-th { font: 600 12px var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border-top: 0; }
-th:first-child, td:first-child { text-align: left; font-family: var(--sans); }
-td.best { color: var(--sys); font-weight: 600; }
-.table-wrap { overflow-x: auto; }
-.fail-row { padding: 12px 0; border-top: 1px solid var(--line); }
-.fail-row:first-child { border-top: 0; }
-.fail-row .l1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.fail-row .cat { font: 600 13px var(--mono); }
-.placeholder-banner { background: repeating-linear-gradient(-45deg, #fff7ed, #fff7ed 10px, #ffedd5 10px, #ffedd5 20px);
-                      border: 1px solid var(--warn); color: var(--warn-ink); border-radius: 12px; padding: 10px 14px; font: 600 12px var(--mono); letter-spacing: .03em; }
-
-/* fit */
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field input, .field select { height: 48px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 0 12px; }
-.field input { font-family: var(--mono); }
-.presets { display: flex; gap: 8px; flex-wrap: wrap; }
-.presets button { height: 36px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-size: 13px; }
-.presets button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-/* 3D (ids/classes used by three3d.js) */
-#view3d { position: relative; height: 62vh; min-height: 380px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px 48px; }
+header { display: flex; align-items: center; gap: 12px; padding: 16px 0 12px; }
+header .brand { font-weight: 700; font-size: 20px; letter-spacing: -.01em; }
+header .tag { color: var(--muted); }
+header .spacer { flex: 1; }
+.pill { font: 600 12px var(--mono); padding: 4px 10px; border-radius: 99px; background: var(--line); color: var(--muted); }
+.pill.live { background: var(--ok-tint); color: var(--ok-ink); } .pill.off { background: var(--bad-tint); color: var(--bad-ink); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--float); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px;
+       border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); font: 600 14px var(--sans); cursor: pointer; white-space: nowrap; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.small { height: 32px; padding: 0 12px; font-size: 13px; }
+.btn.rec { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+/* empty state */
+.hero { padding: 56px 32px; text-align: center; margin-top: 12px; }
+.hero h1 { font-size: 34px; letter-spacing: -.02em; margin: 0 0 8px; }
+.hero p.lead { color: var(--muted); font-size: 17px; margin: 0 auto 26px; max-width: 640px; }
+.hero .actions { display: flex; gap: 10px; justify-content: center; }
+.starts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 860px; margin: 0 auto; text-align: left; }
+.start { border: 1px solid var(--line-strong); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 4px; }
+.start b { font-size: 16px; } .start span { color: var(--muted); font-size: 14px; flex: 1; }
+.start .actions { justify-content: flex-start; margin-top: 10px; }
+.how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 36px auto 0; max-width: 860px; text-align: left; }
+.how div { border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.how b { display: block; margin-bottom: 2px; }
+.how span { color: var(--muted); font-size: 14px; }
+.progress { margin: 16px auto 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; font: 500 12px var(--mono); color: var(--muted); }
+.progress span { padding: 4px 10px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
+.progress span.on { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-tint); }
+.progress span.done { color: var(--ok-ink); border-color: var(--ok); }
+.progress.left { justify-content: flex-start; margin: 10px 0 0; }
+.error { margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: var(--bad-tint); color: var(--bad-ink); font-weight: 500; }
+/* answers bar */
+.answers { padding: 18px 20px; margin-top: 4px; }
+.answers .head { display: flex; gap: 12px; align-items: center; }
+.answers .head h2 { margin: 0; font-size: 21px; letter-spacing: -.01em; flex: 1; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; border-left-width: 5px; }
+.tile.ok { border-left-color: var(--ok); } .tile.warn { border-left-color: var(--warn); } .tile.bad { border-left-color: var(--bad); } .tile.none { border-left-color: var(--line-strong); }
+.tile small { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.tile b { display: block; font: 700 22px var(--sans); letter-spacing: -.01em; margin: 2px 0; }
+.tile span { color: var(--muted); font-size: 13px; }
+/* main */
+.main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr); gap: 16px; margin-top: 16px; align-items: start; }
+.canvas { position: sticky; top: 12px; padding: 12px; }
+.canvas .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; background: var(--panel); padding: 7px 14px; font: 600 13px var(--sans); cursor: pointer; color: var(--ink); }
+.seg button.on { background: var(--ink); color: #fff; }
+.seg button:disabled { color: var(--line-strong); cursor: not-allowed; }
+.canvas .hint { color: var(--muted); font-size: 13px; margin-left: auto; }
+.planbox { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+.planbox svg { display: block; width: 100%; height: auto; max-height: 68vh; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 2px 0; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+/* room panel */
+.panel { padding: 16px 18px; }
+.roomchips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.roomchips button { height: 30px; padding: 0 11px; border-radius: 99px; border: 1px solid var(--line-strong); background: var(--panel); cursor: pointer; font: 500 13px var(--sans); }
+.roomchips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.roomchips button.bed::before { content: "🛏 "; }
+.rhead { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; }
+.rhead h3 { margin: 0; font-size: 22px; letter-spacing: -.01em; flex: 1; }
+.rsub { color: var(--muted); font-size: 13px; }
+.sec { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
+.sec h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 14px; }
+.kv .v { font: 500 13px var(--mono); text-align: right; }
+.chk { display: grid; grid-template-columns: 20px 1fr auto; gap: 5px 6px; font-size: 14px; }
+.chk .v { color: var(--muted); font: 500 13px var(--mono); text-align: right; }
+.y { color: var(--ok-ink); font-weight: 700; } .n { color: var(--bad-ink); font-weight: 700; } .q { color: var(--warn-ink); font-weight: 700; }
+.chip { display: inline-block; font: 700 11px var(--mono); letter-spacing: .03em; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
+.chip.ok { background: var(--ok-tint); color: var(--ok-ink); } .chip.bad { background: var(--bad-tint); color: var(--bad-ink); }
+.chip.warn { background: var(--warn-tint); color: var(--warn-ink); } .chip.plain { background: var(--bg); color: var(--muted); }
+.note { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.callout { border-radius: 10px; padding: 10px 12px; margin-top: 8px; font-size: 14px; }
+.callout.ok { background: var(--ok-tint); } .callout.warn { background: var(--warn-tint); } .callout.bad { background: var(--bad-tint); } .callout.info { background: var(--accent-tint); }
+.callout b { display: block; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets button { height: 32px; padding: 0 11px; border-radius: 99px; border: 1px solid var(--line-strong); background: var(--panel); cursor: pointer; font: 500 13px var(--sans); }
+.presets button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
+.field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); font-weight: 600; }
+input[type=number] { width: 76px; height: 36px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 8px; font: 14px var(--sans); }
+footer { margin-top: 22px; color: var(--muted); font-size: 13px; text-align: center; }
+/* plan svg */
+.room { stroke-width: 2.5; vector-effect: non-scaling-stroke; fill-opacity: .12; cursor: pointer; transition: fill-opacity .15s; }
+.room:hover { fill-opacity: .28; }
+.room.ok { stroke: var(--ok); fill: var(--ok); } .room.est { stroke: var(--warn); fill: var(--warn); stroke-dasharray: 7 5; }
+.room.fail { stroke: var(--bad); fill: var(--bad); }
+.room.sel { stroke: var(--accent); fill: var(--accent); fill-opacity: .22; stroke-width: 5; stroke-dasharray: none; }
+.fitrect { stroke-width: 3; vector-effect: non-scaling-stroke; fill-opacity: .5; pointer-events: none; }
+/* 3D — ids/classes used by three3d.js */
+#view3d { position: relative; height: 68vh; min-height: 420px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
 #view3d canvas { display: block; }
 .labels3d { position: absolute; top: 0; left: 0; pointer-events: none; }
-.label3d { pointer-events: auto; cursor: pointer; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
-           border-radius: 9999px; padding: 3px 10px; font: 500 11px var(--mono); display: flex; gap: 6px; white-space: nowrap; box-shadow: var(--float); }
-.label3d span { color: var(--muted); }
-.label3d.fail { border-color: var(--bad); color: var(--bad-ink); }
-.label3d.unverified { border-style: dashed; border-color: var(--warn); }
-.label3d.entrance { color: var(--accent-ink); font-weight: 700; pointer-events: none; }
-.view3d-caption { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2; background: rgba(15,23,42,.88);
-                  color: #fff; padding: 8px 16px; border-radius: 8px; font: 600 13px var(--mono); letter-spacing: .03em; white-space: nowrap;
-                  max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
-.view3d-notice { position: absolute; top: 12px; left: 12px; z-index: 2; background: color-mix(in srgb, var(--warn) 12%, white); color: var(--warn-ink);
-                 border: 1px solid var(--warn); border-radius: 9999px; padding: 4px 12px; font: 600 11px var(--mono); letter-spacing: .03em; }
-.view3d-caption.fail { background: color-mix(in srgb, var(--bad) 85%, black); }
-
-/* tab bar */
-.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--line); box-shadow: var(--float); }
-.tabbar .in { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); }
-.tabbar button { border: 0; background: none; padding: 10px 0 12px; display: flex; flex-direction: column; align-items: center; gap: 4px;
-                 cursor: pointer; color: var(--ink); font: 500 11px var(--mono); letter-spacing: .03em; }
-.tabbar button svg { width: 24px; height: 24px; }
-.tabbar button.active { color: var(--accent); }
-.tip-mock { font: 600 11px var(--mono); color: var(--warn-ink); }
-.muted { color: var(--muted); }
+.label3d { pointer-events: auto; cursor: pointer; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 99px;
+           padding: 3px 10px; font: 500 11px var(--mono); display: flex; gap: 6px; white-space: nowrap; box-shadow: var(--float); }
+.label3d span { color: var(--muted); } .label3d.fail { border-color: var(--bad); color: var(--bad-ink); }
+.label3d.unverified { border-style: dashed; border-color: var(--warn); } .label3d.entrance { color: var(--accent-ink); font-weight: 700; pointer-events: none; }
+.view3d-caption { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2; background: rgba(15,23,42,.88); color: #fff;
+                  padding: 7px 14px; border-radius: 8px; font: 600 12px var(--mono); white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+.view3d-caption.fail { background: #991b1b; }
+#view3d-reset { position: absolute; right: 12px; top: 12px; z-index: 3; }
+/* CAD view of a filmed room (cad3d.js) */
+#cad3d { position: relative; height: 68vh; min-height: 440px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #f6f7f9; }
+#cad3d canvas { display: block; }
+.cad-tools { position: absolute; left: 0; right: 0; top: 0; z-index: 5; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); font-weight: 600;
+             padding: 8px 10px; background: rgba(246, 247, 249, .94); border-bottom: 1px solid var(--line); }
+.cad-tools button { height: 30px; padding: 0 10px; border-radius: 99px; border: 1px solid var(--line-strong); background: #fff; cursor: pointer; font: 600 12px var(--sans); }
+.cad-tools button:hover { border-color: var(--accent); color: var(--accent-ink); }
+.cad-hud { position: absolute; left: 10px; bottom: 10px; z-index: 5; background: rgba(15,23,42,.88); color: #fff; padding: 7px 12px; border-radius: 8px; font: 600 12px var(--mono); max-width: calc(100% - 20px); }
+.cad-hud.ok { background: #047857; } .cad-hud.warn { background: #b45309; } .cad-hud.bad { background: #b91c1c; }
+#cad-agent { margin-top: 10px; }
+.cad-ask { display: flex; gap: 6px; }
+.cad-ask input { flex: 1; min-width: 0; height: 38px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 12px; font: 14px var(--sans); background: #fff; }
+.cad-ask .btn { height: 38px; }
+.cad-say { margin-top: 8px; max-height: 260px; overflow: auto; background: #fff; border: 1px solid var(--accent); color: var(--ink);
+           border-radius: 10px; padding: 9px 11px; font-size: 13px; }
+.cad-say > div + div { margin-top: 6px; }
+.cad-say .ok-line { color: var(--ok-ink); font-weight: 600; } .cad-say .warn-line { color: var(--warn-ink); }
+.cad-say .sugs b { display: block; margin-bottom: 4px; }
+.cad-say .opt { display: flex; gap: 8px; align-items: flex-start; margin-top: 5px; }
+.cad-say .opt button { flex: none; height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; font: 600 12px var(--sans); cursor: pointer; }
+.cad-tools button:disabled { opacity: .45; cursor: not-allowed; }
+.dim3d { font: 700 11px var(--mono); background: #fff; color: #1d4ed8; border: 1px solid #1d4ed8; border-radius: 6px; padding: 1px 6px; white-space: nowrap; pointer-events: none; }
+.dim3d.ok { color: #047857; border-color: #059669; } .dim3d.bad { color: #b91c1c; border-color: #dc2626; }
+.dim3d.tag { color: var(--muted); border-color: var(--line-strong); font-weight: 500; }
+.dim3d.piece { color: var(--ink); border-color: var(--line-strong); font-weight: 600; }
+@media (max-width: 960px) { .main, .tiles, .how, .starts { grid-template-columns: 1fr; } .canvas { position: static; } }
 </style>
-</head>
-<body>
-<div class="app">
-  <header class="top">
-    <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h8v9M11 3v5M15 12h6"/></svg></div>
-    <span class="title">Footprint</span><span class="chip nyc">NYC</span>
-    <span class="spacer"></span>
-    <span id="mock-badge" class="chip warn" hidden>MOCK DATA</span>
-  </header>
-
-  <!-- ============ VERIFY ============ -->
-  <section data-tab="verify" class="active">
-    <div class="stack">
-      <div class="card">
-        <div class="upload">
-          <label class="btn primary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
-            Upload floor plan<input id="file" type="file" accept="image/*" hidden></label>
-          <div><div style="font-weight:600">Is that 2BR actually a 2BR?</div>
-            <div class="sub" id="source-line">Any listing floor plan → verified model</div></div>
-        </div>
-        <div class="stages" id="stages" hidden></div>
-      </div>
-
-      <div class="card verdict pending" id="verdict">
-        <div class="label">Verdict</div>
-        <div class="verdict-text" id="verdict-text">—</div>
-        <div class="reason" id="verdict-sub"></div>
-      </div>
-
-      <div class="grid2" id="pair"></div>
-
-      <div class="cols">
-        <div class="stack">
-          <div class="canvas"><svg id="plan-verify"></svg></div>
-          <div class="card">
-            <div class="score-row"><span class="label">Alignment score</span><span class="score-num" id="score-num">–</span></div>
-            <div class="bar" style="margin-top:10px"><div id="score-fill" style="background:var(--accent)"></div></div>
-            <div class="iters" id="score-iters"></div>
-          </div>
-        </div>
-        <div class="stack">
-          <div class="section-head"><h3>Legal bedrooms</h3><span class="chip info">NYC minimums</span></div>
-          <div class="stack" id="legal"></div>
-          <div class="section-head"><h3>Decisions</h3><span class="chip info" id="cost-badge"></span></div>
-          <div class="card" id="decisions"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ 2D MODEL ============ -->
-  <section data-tab="plan">
-    <div class="cols">
-      <div class="stack">
-        <div class="canvas"><svg id="plan-2d"></svg></div>
-        <div class="legend">
-          <span><i style="border-color:var(--ok);background:color-mix(in srgb,var(--ok) 20%,white)"></i>verified</span>
-          <span><i style="border-color:var(--warn);border-style:dashed"></i>unverified / flagged</span>
-          <span><i style="border-color:var(--bad);background:color-mix(in srgb,var(--bad) 20%,white)"></i>fails a check</span>
-          <span><i style="border-color:var(--accent);border-style:dotted;border-radius:50%"></i>clear path to entrance</span>
-        </div>
-      </div>
-      <div class="stack">
-        <div class="card"><div class="label">Square footage</div><div class="rows" id="area" style="margin-top:8px"></div></div>
-        <div class="card"><div class="label">Rooms</div><div class="rows" id="rooms" style="margin-top:8px"></div></div>
-        <div class="card"><div class="label">Answers</div><div class="rows" id="answers" style="margin-top:8px"></div></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ 3D ============ -->
-  <section data-tab="3d">
-    <div class="section-head" style="margin-bottom:12px"><span class="muted">Drag to orbit · click a room to step inside</span>
-      <button id="view3d-reset" class="btn">Overview</button></div>
-    <div id="view3d"><div id="view3d-caption" class="view3d-caption" hidden></div></div>
-  </section>
-
-  <!-- ============ FIT ============ -->
-  <section data-tab="fit">
-    <div class="cols">
-      <div class="card stack" id="fit-form">
-        <div><h2>Will it fit?</h2><div class="sub" id="fit-sub">Checked against the traced room shape, with clearance.</div></div>
-        <div class="presets" id="presets"></div>
-        <div class="grid2">
-          <label class="field"><span class="label">Width ft</span><input id="fit-w" type="number" step="0.1" min="0.5"></label>
-          <label class="field"><span class="label">Depth ft</span><input id="fit-d" type="number" step="0.1" min="0.5"></label>
-          <label class="field"><span class="label">Clearance ft</span><input id="fit-c" type="number" step="0.5" min="0"></label>
-          <label class="field"><span class="label">Room</span><select id="fit-room"></select></label>
-        </div>
-        <button class="btn primary" id="fit-go">Check fit</button>
-        <button class="btn" id="fit-voice" hidden title="Try: “Will a 7-foot sofa fit in the living room?”">🎤 Ask by voice</button>
-        <button class="btn" id="fit-sample" hidden>Analyze sample plan (live backend)</button>
-        <div id="fit-out"></div>
-      </div>
-      <div class="canvas"><svg id="plan-fit"></svg></div>
-    </div>
-  </section>
-
-  <!-- ============ EVAL / PROOF ============ -->
-  <section data-tab="eval">
-    <div class="stack" id="proof"></div>
-  </section>
-</div>
-
-<nav class="tabbar"><div class="in" id="tabbar">
-  <button data-go="verify" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>Verify</button>
-  <button data-go="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 4h18v16H3zM3 12h9v8M12 4v4M16 12h5"/></svg>2D Model</button>
-  <button data-go="3d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg>3D View</button>
-  <button data-go="fit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 11V8a2 2 0 012-2h10a2 2 0 012 2v3"/><path d="M3 13a2 2 0 014 0v1h10v-1a2 2 0 014 0v4H3zM5 17v2M19 17v2"/></svg>Fit</button>
-  <button data-go="eval"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>Eval</button>
-</div></nav>
-
 <script type="importmap">
   { "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
 </script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="brand">Footprint</span><span class="tag">Is that 2BR actually a 2BR?</span>
+    <span class="spacer"></span>
+    <button class="btn small" id="new-plan" hidden>Start over</button>
+    <span class="pill" id="health">checking backend…</span>
+  </header>
+
+  <!-- ============ empty state ============ -->
+  <section class="card hero" id="empty">
+    <h1>Is that 2BR actually a 2BR?</h1>
+    <p class="lead">Drop in a listing's floor plan. Footprint rebuilds the apartment, checks every bedroom against NYC rules,
+       and lets you film a room at the viewing and try your furniture before you sign.</p>
+    <div class="starts">
+      <div class="start"><b>I have the listing's floor plan</b><span>Check bedrooms and square footage before you visit.</span>
+        <div class="actions"><label class="btn primary">Upload floor plan<input id="plan-file" type="file" accept="image/*" hidden></label>
+          <button class="btn" id="plan-sample">Try a sample</button></div></div>
+      <div class="start"><b>I'm at the apartment: no plan</b><span>Film one room for 15–30 s. Get its real size, ceiling height and a 3D model to fit furniture.</span>
+        <div class="actions"><label class="btn primary">Upload a room video<input id="video-only" type="file" accept="video/*" hidden></label></div></div>
+    </div>
+    <div class="progress" id="p1" hidden></div>
+    <div class="error" id="e1" hidden></div>
+    <div class="how">
+      <div><b>1 · The listing, checked</b><span>Real bedroom count and square footage, from the plan's own dimensions.</span></div>
+      <div><b>2 · A room, measured</b><span>Film it for 20 s at the viewing: real size and ceiling height, compared with the plan.</span></div>
+      <div><b>3 · Your furniture, placed</b><span>Bed, sofa, desk: placed with walkway space and a clear way out.</span></div>
+    </div>
+  </section>
+
+  <!-- ============ apartment ============ -->
+  <div id="app" hidden>
+    <section class="card answers">
+      <div class="head"><h2 id="headline"></h2></div>
+      <div class="tiles">
+        <div class="tile" id="t-beds"><small>Is it really a 2BR?</small><b></b><span></span></div>
+        <div class="tile" id="t-area"><small>Is it really the size listed?</small><b></b><span></span></div>
+        <div class="tile" id="t-ceil"><small>How high are the ceilings?</small><b></b><span></span></div>
+      </div>
+    </section>
+
+    <div class="main">
+      <section class="card canvas">
+        <div class="bar">
+          <div class="seg" id="src"><button data-src="plan" class="on">Floor plan</button><button data-src="video" disabled>Your video</button></div>
+          <div class="seg" id="dim"><button data-v="2d" class="on">2D</button><button data-v="3d">3D</button></div>
+          <span class="hint" id="canvas-hint">Click a room</span>
+        </div>
+        <div class="planbox" id="planbox"><svg id="plan"></svg></div>
+        <div id="view3d" hidden><button class="btn small" id="view3d-reset">Overview</button><div id="view3d-caption" class="view3d-caption" hidden></div></div>
+        <div id="cad3d" hidden>
+          <div class="cad-tools"><span>Try in this room:</span>
+            <button data-add="King bed|6.33|6.67|2">+ King bed</button><button data-add="Queen bed|5|6.67|2">+ Queen bed</button>
+            <button data-add="Sofa|7|3|2.8">+ Sofa</button><button data-add="Desk|5|2.5|2.5">+ Desk</button>
+            <button id="cad-undo" disabled>↶ Undo</button></div>
+          <div id="cad-hud" class="cad-hud"></div>
+        </div>
+        <div id="cad-agent" hidden>             <!-- below the 3D view, never on top of it -->
+          <form class="cad-ask" id="cad-ask"><input id="cad-text" autocomplete="off"
+              placeholder="Tell it what to do: “put a queen bed under the window and a desk by the door”, “show me other layouts”">
+            <button class="btn primary small" type="submit">Do it</button></form>
+          <div id="cad-say" class="cad-say" hidden></div>
+        </div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>selected</span><span><i style="background:var(--ok)"></i>outline confirmed</span>
+          <span><i style="background:var(--warn)"></i>outline estimated</span><span><i style="background:var(--bad)"></i>fails a bedroom rule</span></div>
+      </section>
+
+      <section class="card panel">
+        <div class="roomchips" id="chips"></div>
+        <div id="room"></div>
+      </section>
+    </div>
+  </div>
+
+  <footer>Room-video accuracy, tested on 3 rooms of known size: average error 12%, true size inside the reported range 3 of 3.
+    Plan areas come from the plan's printed dimensions; with none printed, Footprint says so instead of guessing.</footer>
+</div>
+
+<input id="scan-file" type="file" accept="video/*" hidden>
+
 <script>
-// Footprint UI. Serve from repo root: `python3 -m http.server 5500` → http://localhost:5500/frontend/
-// ?api=http://host:port (default http://localhost:8000) · ?mock=1 skip backend · ?mock=noscale load the no-scale mock
+// ================= setup =================
 const params = new URLSearchParams(location.search);
 const API = params.get("api") || "http://localhost:8000";
-const MOCKS = { ok: ["../samples/mock_model.json", "mock_plan.svg"],
-                noscale: ["../samples/mock_model_noscale.json", "mock_plan_nodims.svg"] };
 const SAMPLE_PLAN = "../samples/synthetic_2br.png";
-// TEST results first; DEV results while the TEST run is still going; mock only if neither exists.
-const RESULTS = ["../eval/results.json", "../eval/results_dev.json", "../samples/mock_results.json"];
-const STAGES = ["Reading plan…", "Tracing rooms…", "Verifying…", "Checking code…"];
-const PRESETS = [
-  { name: "King bed", w: 6.33, d: 6.67, c: 3, h: 2 }, { name: "Queen bed", w: 5, d: 6.67, c: 3, h: 2 },
-  { name: "Sofa 7 ft", w: 7, d: 3, c: 1.5, h: 2.8 }, { name: "Desk", w: 4, d: 2, c: 3, h: 2.5 }, { name: "Custom", w: null, d: null, c: 1.5, h: 2.5 },
-];
-const NOT_INFO_FLAGS = new Set(["no_printed_dims", "no_scale"]); // informational, not warnings
-
-let lastError = null, verdictTimer = null; // why we fell back to the mock, shown to the user
-let model = null, imageUrl = null, isMock = false, timers = [], tab = "verify", built3d = null, fitResult = null;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const n0 = (v) => (v == null ? "—" : Math.round(v).toLocaleString());
-const n1 = (v) => (v == null ? "—" : (+v).toFixed(1));
+const n0 = (v) => v == null ? "—" : Math.round(v).toLocaleString();
+const f1 = (v) => v == null ? "—" : (+v).toFixed(1);
 const chip = (cls, t) => `<span class="chip ${cls}">${esc(t)}</span>`;
-const room = (id) => model.rooms.find((r) => r.id === id || r.label === id);
-const rname = (id) => room(id)?.label || id;
-const noScale = () => model.scale_status === "undetermined" || model.scale_px_per_ft == null;
-// Bedroom by label: English "Bedroom", "BR 2", "MBR"; Finnish "MH", "MH1", "makuuhuone" (CubiCasa plans).
-const BEDROOM_RE = /bed|makuuhuone|^\s*(m?br|mh)\s*\d*\s*$/i;
-const isBedroom = (r) => BEDROOM_RE.test(r?.label || "");
-// Every bedroom the plan labels, with the backend's legal verdict when it judged that room (else legal: null).
-function bedroomRows() {
-  const judged = model.answers?.legal_bedrooms || [];
-  const ids = new Set(judged.map((b) => b.room));
-  const unchecked = model.rooms.filter((r) => isBedroom(r) && !ids.has(r.id)).map((r) => ({
-    room: r.id, legal: null, unchecked: true, checks: {},
-    reason: `Labelled "${r.label}" (a bedroom), but the legal check didn't run on it.`,
-  }));
-  return [...judged, ...unchecked];
-}
-async function getJSON(url, opts) { const r = await fetch(url, opts); if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }
-const withTimeout = (ms) => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal; };
+const isBedroom = (r) => /bed|bdrm|(^|[^a-z])br([^a-z]|$)/i.test(r?.label || "");
+const PRESETS = [{ name: "King bed", w: 6.33, d: 6.67, c: 3 }, { name: "Queen bed", w: 5, d: 6.67, c: 3 }, { name: "Full bed", w: 4.5, d: 6.25, c: 3 },
+                 { name: "Sofa 7 ft", w: 7, d: 3, c: 2.5 }, { name: "Desk", w: 5, d: 2.5, c: 2.5 }];
+const S = { plan: null, planImg: null, scans: {}, sel: null, src: "plan", view: "2d", fit: null, busy: null, form: { ...PRESETS[0], preset: 0 }, built3d: null };
 
-// ---------------- loading ----------------
-async function loadMock(kind = "ok") {
-  const [m, img] = MOCKS[kind] || MOCKS.ok;
-  model = await getJSON(m); imageUrl = img; isMock = true;
-  render();
-}
-
-// Formats the server can decode (OpenCV). iPhone HEIC, PDF and SVG are not.
-const UNSUPPORTED = /\.(heic|heif|pdf|svg)$/i;
-function uploadError(msg) {
-  clearTimeout(verdictTimer); // a pending verdict animation must not overwrite the error
-  $("stages").hidden = true;
-  setVerdict("warn", "<em>Couldn't analyze</em> this plan", msg);
-  $("source-line").textContent = `Upload failed · ${msg}`;
-}
-
-// fallbackToMock: only for the automatic sample on page load. A user's own upload never turns into mock data.
-async function analyze(file, { fallbackToMock = false } = {}) {
-  if (UNSUPPORTED.test(file.name) || /heic|heif|pdf|svg/i.test(file.type)) {
-    return uploadError(`${file.name} is ${file.name.split(".").pop().toUpperCase()}; upload a PNG or JPG (screenshot the plan if needed).`);
-  }
-  const prevImage = imageUrl;
-  imageUrl = URL.createObjectURL(file);
-  $("stages").hidden = false;
-  let i = 0;
-  const tick = () => { $("stages").innerHTML = STAGES.map((s, j) => `<span class="stage ${j < i ? "done" : j === i ? "on" : ""}">${j < i ? "✓ " : ""}${s}</span>`).join(""); };
-  tick();
-  const iv = setInterval(() => { if (i < STAGES.length - 1) { i++; tick(); } }, 5500);
-  setVerdict("pending", "Analyzing…", "This takes about 15–25 seconds.");
+async function api(path, opts = {}, ms = 90000) {
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    const form = new FormData();
-    form.append("file", file); // server.py: multipart "file"
-    const res = await fetch(`${API}/analyze`, { method: "POST", body: form, signal: withTimeout(90000) });
-    const body = await res.json().catch(() => null);
-    if (!res.ok || !body?.rooms) {
-      const why = body?.errors?.map((e) => e.error).join("; ") || body?.error || `HTTP ${res.status}`;
-      throw new Error(res.status === 400 ? `the server couldn't read this image (${why})` : why);
-    }
-    model = body;
-    isMock = false; lastError = null;
-    if (model.partial && model.model_id) pollFull(model.model_id);
-  } catch (err) {
-    clearInterval(iv);
-    const why = err.name === "AbortError" ? "no answer from the backend in 90 s"
-      : /Failed to fetch|NetworkError|Load failed/i.test(err.message) ? `backend not reachable at ${API}` : err.message;
-    console.warn("analyze failed", err);
-    if (!fallbackToMock) { imageUrl = prevImage; return uploadError(why); }
-    lastError = `analyze failed: ${why}`;
-    const [m, img] = MOCKS.ok;
-    model = await getJSON(m); imageUrl = img; isMock = true;
-  }
-  clearInterval(iv); i = STAGES.length; tick();
-  setTimeout(() => ($("stages").hidden = true), 1500);
-  render();
+    const r = await fetch(API + path, { ...opts, signal: ctrl.signal });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok && !(body && body.rooms)) throw new Error(body.error || body.errors?.[0]?.error || `HTTP ${r.status}`);
+    return body;
+  } finally { clearTimeout(t); }
 }
-
-// /analyze returns a partial model after its 45 s deadline; the full one lands at GET /model/{id}.
-async function pollFull(id) {
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 3000));
-    if (model?.model_id !== id) return; // user moved on
-    try {
-      const m = await getJSON(`${API}/model/${id}`, { signal: withTimeout(5000) });
-      if (!m.partial) { model = m; render(); return; }
-    } catch {}
-  }
+function showErr(id, msg) { const e = $(id); if (e) { e.textContent = msg; e.hidden = !msg; } }
+function stages(el, list, everyMs) {           // time-based progress (the backend doesn't stream stages)
+  let i = 0; const t0 = Date.now();
+  const draw = () => { el.innerHTML = list.map((s, j) => `<span class="${j < i ? "done" : j === i ? "on" : ""}">${j < i ? "✓ " : ""}${s}</span>`).join("") +
+                       `<span>${Math.round((Date.now() - t0) / 1000)} s</span>`; };
+  el.hidden = false; draw();
+  const iv = setInterval(() => { if (!el.isConnected) return clearInterval(iv); if (i < list.length - 1 && Date.now() - t0 > (i + 1) * everyMs) i++; draw(); }, 500);
+  return () => { clearInterval(iv); el.hidden = true; };
 }
-async function analyzeSample() {
-  const blob = await (await fetch(SAMPLE_PLAN)).blob();
-  return analyze(new File([blob], "synthetic_2br.png", { type: "image/png" }), { fallbackToMock: !model });
-}
-
-// ---------------- render ----------------
-function render() {
-  timers.forEach(clearTimeout); timers = [];
-  fitResult = null;
-  $("mock-badge").hidden = !isMock;
-  $("source-line").textContent = !isMock ? `Live · ${API}`
-    : lastError ? `Mock data: ${lastError}` : "Mock data (backend not used)";
-  drawPlan($("plan-verify"), { anim: true });
-  drawPlan($("plan-2d"), { anim: false, paths: true });
-  drawPlan($("plan-fit"), { anim: false });
-  animateScore(); renderVerdict(); renderPair(); renderLegal(); renderDecisions();
-  renderArea(); renderRooms(); renderAnswers(); renderFit();
-  built3d = null;
-  if (tab === "3d") build3d();
-  $("fit-sample").hidden = !isMock;
-}
-
-function status(r) {
-  const a = model.answers || {};
-  const bedFail = a.king_bed_fits?.fits === false && a.king_bed_fits.room === r.id;
-  const illegal = (a.legal_bedrooms || []).some((b) => b.room === r.id && b.legal === false);
-  if (illegal || bedFail) return "fail";
-  if (!r.verified) return "unverified";
-  if ((r.flags || []).some((f) => !NOT_INFO_FLAGS.has(f))) return "flag";
-  return "ok";
-}
-
-const NS = "http://www.w3.org/2000/svg";
-function el(tag, attrs, parent) {
-  const n = document.createElementNS(NS, tag);
-  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-  parent && parent.appendChild(n); return n;
-}
-function centroid(poly) { // area-weighted, so L-shapes label inside
-  let a = 0, cx = 0, cy = 0;
-  poly.forEach(([x1, y1], i) => { const [x2, y2] = poly[(i + 1) % poly.length]; const f = x1 * y2 - x2 * y1; a += f; cx += (x1 + x2) * f; cy += (y1 + y2) * f; });
-  if (!a) return poly[0];
-  return [cx / (3 * a), cy / (3 * a)];
-}
-
-function drawPlan(svg, { anim, paths }) {
-  svg.innerHTML = "";
-  const { w, h } = model.image;
-  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-  el("image", { href: imageUrl, x: 0, y: 0, width: w, height: h }, svg);
-  const stagger = anim ? Math.min(260, 1800 / Math.max(1, model.rooms.length)) : 0;
-  model.rooms.forEach((r, i) => {
-    if (!r.polygon?.length) return;
-    const st = status(r), delay = `animation-delay:${i * stagger}ms`;
-    const p = el("polygon", { points: r.polygon.map((q) => q.join(",")).join(" "), class: `room ${st}`, style: delay, "data-id": r.id }, svg);
-    p.addEventListener("mouseenter", () => highlight(r.id, true));
-    p.addEventListener("mouseleave", () => highlight(r.id, false));
-    p.addEventListener("click", () => { go("3d"); setTimeout(() => window.Footprint3D?.focusRoom(r.id), 50); });
-    const [cx, cy] = centroid(r.polygon);
-    const sub = !r.verified ? "unverified" : r.area_sqft != null ? `${Math.round(r.area_sqft)} sq ft` : "? sq ft";
-    const bw = Math.max(r.label.length * 7.4, sub.length * 7.2) + 18; // estimate: hidden tabs can't getBBox
-    const g = el("g", { class: "rlabel", style: delay }, svg);
-    el("rect", { x: cx - bw / 2, y: cy - 21, width: bw, height: 40, rx: 8, class: `lbl-bg ${st}` }, g);
-    const t = el("text", { x: cx, y: cy - 4, "text-anchor": "middle" }, g);
-    t.textContent = r.label;
-    const t2 = el("text", { x: cx, y: cy + 12, "text-anchor": "middle", class: r.verified ? "m" : "u" }, g);
-    t2.textContent = sub;
-  });
-  if (paths) clearPaths().forEach((c) => c.path?.length > 1 &&
-    el("polyline", { points: c.path.map((q) => q.join(",")).join(" "), class: `cpath ${c.ok === false ? "bad" : ""}` }, svg));
-  (model.windows || []).forEach((wi) => wi.center && el("rect", { x: wi.center[0] - 5, y: wi.center[1] - 5, width: 10, height: 10, rx: 2, class: "win" }, svg));
-  (model.doors || []).forEach((d) => d.center && el("circle", { cx: d.center[0], cy: d.center[1], r: 6, class: "door" }, svg));
-  if (model.entrance) el("circle", { cx: model.entrance[0], cy: model.entrance[1], r: 12, class: "entr" }, svg);
-  if (svg.id === "plan-fit" && fitResult) drawFitRect(svg);
-}
-function highlight(id, on) { document.querySelectorAll(`.room[data-id="${id}"]`).forEach((p) => p.classList.toggle("hl", on)); }
-function clearPaths(c = model.answers?.clear_path) { return Array.isArray(c) ? c : c?.per_room?.length ? c.per_room : c?.from ? [c] : []; }
-
-function animateScore() {
-  const hist = model.alignment_score_history || [];
-  $("score-fill").style.width = "0"; $("score-num").textContent = "–"; $("score-iters").innerHTML = "";
-  hist.forEach((s, i) => timers.push(setTimeout(() => {
-    $("score-fill").style.width = `${s * 100}%`;
-    $("score-num").textContent = s.toFixed(2);
-    $("score-iters").innerHTML = hist.slice(0, i + 1).map((v, j) =>
-      chip(j === i ? "info" : "", `iter ${j + 1} · ${v.toFixed(2)}`)).join("");
-  }, 400 + i * 900)));
-}
-
-// ---------------- verdict ----------------
-function setVerdict(cls, text, sub) {
-  $("verdict").className = `card verdict ${cls}`;
-  $("verdict-text").innerHTML = text; $("verdict-sub").textContent = sub || "";
-}
-function renderVerdict() {
-  const a = model.answers || {}, area = model.area || {};
-  const beds = bedroomRows();
-  const listed = model.listing_claim?.bedrooms ?? beds.length; // printed claim, else bedrooms the plan labels
-  const legal = beds.filter((b) => b.legal === true).length;
-  const illegal = beds.filter((b) => b.legal === false);
-  const unknown = beds.filter((b) => b.legal == null);
-  const measured = area.from_geometry ?? area.from_printed;
-  let v;
-  if (noScale()) {
-    const parts = [];
-    if (illegal.length) parts.push(illegal.map((b) => `${rname(b.room)} fails anyway: ${b.reason}.`).join(" "));
-    if (unknown.length) parts.push(`${unknown.map((b) => rname(b.room)).join(", ")} can't be confirmed without a scale.`);
-    v = ["warn", `<em>Scale unknown</em>, no dimensions printed`, `We don't guess square footage. ${parts.join(" ")}`];
-  } else if (illegal.length) {
-    const rest = illegal.map((b) => { const r = room(b.room); return r?.area_sqft != null ? `${Math.round(r.area_sqft)} sq ft room` : "non-legal room"; });
-    v = ["bad", `Listed ${listed}BR → <em>${legal} legal bedroom${legal === 1 ? "" : "s"}</em> + ${rest.join(" + ")}`,
-         illegal.map((b) => `${rname(b.room)}: ${b.reason}`).join(" · ")];
-  } else if (area.claim_scope === "same_floor" && area.listing_claim && measured && area.listing_claim > measured * 1.1) {
-    v = ["bad", `Listed ${n0(area.listing_claim)} sq ft → <em>measured ${n0(measured)} sq ft</em>`, `${Math.round((area.listing_claim / measured - 1) * 100)}% more than the plan shows.`];
-  } else if (area.claim_scope === "ambiguous" && area.listing_claim) {
-    v = ["warn", `Listed ${n0(area.listing_claim)} sq ft · <em>this floor ${n0(measured)} sq ft</em>`, "The listing figure may cover other floors, so no verdict on area."];
-  } else if (a.king_bed_fits?.fits === false) {
-    v = ["bad", `<em>A king bed doesn't fit</em> in ${esc(rname(a.king_bed_fits.room))}`, a.king_bed_fits.reason];
-  } else {
-    v = !beds.length && !listed ? ["warn", `<em>No bedrooms</em> on this plan`, "No room is labelled as a bedroom, so there's nothing to check for legal bedroom size."]
-      : unknown.length && !legal ? ["warn", `${beds.length} bedroom${beds.length === 1 ? "" : "s"} labelled · <em>legal status unconfirmed</em>`, unknown.map((b) => `${rname(b.room)}: ${b.reason}`).join(" · ")]
-      : ["ok", `<em>Checks out</em>: ${legal} legal bedroom${legal === 1 ? "" : "s"}`, unknown.length ? `${unknown.length} bedroom(s) unconfirmed.` : ""];
-  }
-  setVerdict("pending", "…", "");
-  clearTimeout(verdictTimer);
-  verdictTimer = setTimeout(() => setVerdict(...v), 400 + (model.alignment_score_history?.length || 1) * 900);
-}
-
-function renderPair() {
-  const a = model.answers || {}, area = model.area || {};
-  const beds = bedroomRows();
-  const listed = model.listing_claim?.bedrooms ?? beds.length;
-  const legal = beds.filter((b) => b.legal === true).length;
-  const unknown = beds.filter((b) => b.legal == null).length;
-  const brText = unknown ? `${legal}–${legal + unknown}BR` : `${legal}BR`;
-  const mismatch = legal + unknown < listed;
-  const none = !beds.length && !listed;
-  const measured = noScale() ? null : (area.from_geometry ?? area.from_printed);
-  const overstated = area.claim_scope === "same_floor" && area.listing_claim && measured && area.listing_claim > measured * 1.1;
-  $("pair").innerHTML = `
-    <div class="metric tint"><div class="head">${model.listing_claim?.bedrooms != null ? "Listing says" : "Plan labels"} ${chip("base", "CLAIM")}</div>
-      <div class="big base">${listed}BR</div>
-      <div class="cap mono">${area.listing_claim != null ? `${n0(area.listing_claim)} sq ft` : "no sq ft claimed"}</div></div>
-    <div class="metric"><div class="head">Footprint verified ${none ? chip("", "NO BEDROOMS") : mismatch ? chip("bad", "MISMATCH") : unknown ? chip("warn", "UNCONFIRMED") : chip("ok", "MATCH")}</div>
-      <div class="big ${none ? "" : mismatch ? "bad" : unknown ? "" : "ok"}">${brText}</div>
-      <div class="cap mono">${measured != null ? `${n0(measured)} sq ft${overstated ? " · claim overstated" : ""}` : "scale unknown"}${unknown ? ` · ${unknown} unconfirmed` : ""}</div></div>`;
-}
-
-// ---------------- legal bedrooms ----------------
-function renderLegal() {
-  const beds = bedroomRows();
-  const fmtVal = { area_ge_80: (r) => r?.area_sqft != null ? `${Math.round(r.area_sqft)} sq ft` : "no scale",
-                   min_width_ge_8ft: (r) => r?.printed_dims_ft ? `${Math.min(...r.printed_dims_ft).toFixed(1)} ft` : noScale() ? "no scale" : "",
-                   exterior_window: () => "", ceiling_height: () => "" };
-  const name = { area_ge_80: "Area ≥ 80 sq ft", min_width_ge_8ft: "Width ≥ 8 ft", exterior_window: "Window on exterior wall", ceiling_height: "Ceiling height" };
-  $("legal").innerHTML = beds.length ? beds.map((b) => {
-    const r = room(b.room), cls = b.legal === true ? "" : b.legal === false ? "bad" : "unknown";
-    const c = b.legal === true ? chip("ok", "LEGAL") : b.legal === false ? chip("bad", "NOT LEGAL") : chip("warn", b.unchecked ? "NOT CHECKED" : "CAN'T CONFIRM");
-    const rows = Object.entries(b.checks || {}).map(([k, v]) => {
-      const ic = v === true ? ["y", "✓"] : v === false ? ["n", "✗"] : ["q", "?"];
-      const val = typeof v === "string" ? "not checkable" : v == null ? "not checkable" : (fmtVal[k]?.(r) || "");
-      return `<div class="check"><span class="ic ${ic[0]}">${ic[1]}</span><span>${name[k] || k}</span><span class="v">${esc(val)}</span></div>`;
-    }).join("");
-    return `<div class="card legal ${cls}" data-room="${esc(b.room)}"><div class="score-row"><h2>${esc(rname(b.room))}</h2>${c}</div>
-      <div class="checks">${rows}</div><div class="reason">${esc(b.reason)}</div></div>`;
-  }).join("") : `<div class="card reason">No rooms labeled bedroom.</div>`;
-  wireHover("legal");
-}
-
-// ---------------- decisions ----------------
-function renderDecisions() {
-  const by = {};
-  (model.decision_checks || []).forEach((c) => (by[c.room] = by[c.room] || []).push(c));
-  const color = (p) => (p >= 0.8 ? "var(--ok)" : p >= 0.6 ? "var(--warn)" : "var(--bad)");
-  $("decisions").innerHTML = Object.entries(by).map(([rid, cs]) => {
-    const r = room(rid);
-    const minP = Math.min(...cs.map((c) => c.p_yes)), open = !r?.verified || minP < 0.6;
-    return `<details class="dec-room" data-room="${esc(rid)}" ${open ? "open" : ""}><summary class="name"><span>${esc(rname(rid))}</span>
-      <span><span class="mono muted" style="font-size:12px;margin-right:8px">min ${Math.round(minP * 100)}%</span>${r ? (r.verified ? chip("ok", "VERIFIED") : chip("warn", "UNVERIFIED")) : ""}</span></summary>
-      ${cs.map((c) => `<div class="prob"><span>${esc(c.question)}</span><b>${Math.round(c.p_yes * 100)}%</b>
-        <div class="bar"><div style="width:${c.p_yes * 100}%;background:${color(c.p_yes)}"></div></div></div>`).join("")}</details>`;
-  }).join("") || `<span class="reason">No checks.</span>`;
-  const t = model.timings_ms || {}, total = Object.values(t).reduce((s, v) => s + (v || 0), 0);
-  $("cost-badge").textContent = `${(total / 1000).toFixed(1)} s · $${(model.cost_usd ?? 0).toFixed(3)}`;
-  $("cost-badge").title = Object.entries(t).map(([k, v]) => `${k} ${v} ms`).join(" · ");
-  wireHover("decisions");
-}
-
-// ---------------- 2D tab ----------------
-function renderArea() {
-  const a = model.area || {};
-  let verdict = "";
-  const measured = a.from_geometry ?? a.from_printed;
-  if (noScale()) verdict = chip("warn", "SCALE UNKNOWN · NO DIMENSIONS PRINTED");
-  else if (a.listing_claim == null || a.claim_scope == null) verdict = `<span class="reason">No listing claim on the plan.</span>`;
-  else if (a.claim_scope === "ambiguous") verdict = `<span class="reason">Claim may cover more than this floor: no verdict.</span>`;
-  else if (measured) {
-    const d = (a.listing_claim - measured) / measured;
-    verdict = d > 0.1 ? chip("bad", `CLAIM ${Math.round(d * 100)}% OVER`) : d < -0.1 ? chip("warn", `CLAIM ${Math.round(-d * 100)}% UNDER`) : chip("ok", "CLAIM MATCHES");
-  }
-  $("area").innerHTML = `
-    <div><span>From printed dims</span><span class="v">${a.from_printed != null ? `${n0(a.from_printed)} sq ft` : "—"}</span></div>
-    <div><span>From traced geometry</span><span class="v">${a.from_geometry != null ? `${n0(a.from_geometry)} sq ft` : "—"}</span></div>
-    <div><span>Listing claims</span><span class="v">${a.listing_claim != null ? `${n0(a.listing_claim)} sq ft` : "—"}</span></div>
-    <div><span class="k">${Array.isArray(a.printed_coverage) ? `Printed dims on ${a.printed_coverage[0]} of ${a.printed_coverage[1]} rooms` : a.printed_coverage != null ? `Printed dims cover ${Math.round(a.printed_coverage * 100)}% of area` : ""}</span>${verdict}</div>
-    <div><span class="k">Scale</span><span class="v">${model.scale_px_per_ft != null ? `${n1(model.scale_px_per_ft)} px/ft` : "—"} · ${esc(model.scale_status)}</span></div>`;
-}
-function renderRooms() {
-  $("rooms").innerHTML = model.rooms.map((r) => {
-    const st = status(r);
-    const dims = r.printed_dims_ft ? `${r.printed_dims_ft[0]}×${r.printed_dims_ft[1]}` : "";
-    return `<div class="room-row ${st}" data-room="${esc(r.id)}"><span>${esc(r.label)}<br><span class="k mono" style="font-size:11px">${dims ? dims + " ft printed · " : ""}conf ${r.confidence != null ? (+r.confidence).toFixed(2) : "—"}${(r.flags || []).length ? " · " + esc(r.flags.join(", ")) : ""}</span></span>
-      <span class="v">${r.area_sqft != null ? `${n1(r.area_sqft)}` : "—"}<span class="k" style="font-size:12px"> sq ft</span></span></div>`;
-  }).join("");
-  wireHover("rooms");
-}
-function renderAnswers() {
-  const a = model.answers || {}, out = [];
-  const yn = (v, y, n) => (v === true ? chip("ok", y) : v === false ? chip("bad", n) : chip("warn", "CAN'T TELL"));
-  if (a.king_bed_fits) out.push(`<div data-room="${esc(a.king_bed_fits.room)}"><span>King bed in ${esc(rname(a.king_bed_fits.room))}<br><span class="reason">${esc(a.king_bed_fits.reason)}</span></span>${yn(a.king_bed_fits.fits, "FITS", "DOESN'T FIT")}</div>`);
-  clearPaths().forEach((c) => out.push(`<div data-room="${esc(c.from)}"><span>Clear path ${esc(rname(c.from))} → ${esc(c.to)}${c.reason ? `<br><span class="reason">${esc(c.reason)}</span>` : ""}</span>${yn(c.ok, "CLEAR", "BLOCKED")}</div>`));
-  $("answers").innerHTML = out.join("") || `<div class="reason">No answers.</div>`;
-  wireHover("answers");
-}
-function wireHover(id) {
-  $(id).querySelectorAll("[data-room]").forEach((n) => {
-    n.addEventListener("mouseenter", () => highlight(n.dataset.room, true));
-    n.addEventListener("mouseleave", () => highlight(n.dataset.room, false));
-  });
-}
-
-// ---------------- fit ----------------
-// Fit is computed ONLY by the backend solver (POST /query on a live model_id); nothing is estimated here.
-let preset = 0;
-const live = () => !isMock && !!model.model_id;
-function renderFit() {
-  const off = noScale(), on = live() && !off;
-  $("fit-sub").textContent = off ? "Can't measure: no scale on this plan."
-    : on ? "Placed by the solver: back to a wall, clearance on 3 sides, clear of door swings."
-    : "Fit runs on a live model. Upload a plan, or analyze the sample plan.";
-  $("fit-form").querySelectorAll("input,select,#fit-go,#presets button").forEach((n) => (n.disabled = !on));
-  $("presets").innerHTML = PRESETS.map((p, i) => `<button data-i="${i}" class="${i === preset ? "on" : ""}" ${on ? "" : "disabled"}>${p.name}</button>`).join("");
-  $("presets").querySelectorAll("button").forEach((b) => (b.onclick = () => { preset = +b.dataset.i; applyPreset(); renderFit(); }));
-  const cur = $("fit-room").value;
-  $("fit-room").innerHTML = model.rooms.map((r) => `<option value="${esc(r.id)}">${esc(r.label)}</option>`).join("");
-  $("fit-room").value = room(cur) ? cur : model.rooms.find(isBedroom)?.id || model.rooms[0]?.id;
-  if (!$("fit-w").value) applyPreset();
-  $("fit-voice").hidden = !(on && canVoice() && !voiceMissing);
-  if (!fitResult) $("fit-out").innerHTML = off ? chip("warn", "CAN'T MEASURE: NO SCALE ON THIS PLAN")
-    : on ? "" : chip("warn", "NEEDS A LIVE MODEL");
-}
-function applyPreset() { const p = PRESETS[preset]; if (p.w) { $("fit-w").value = p.w; $("fit-d").value = p.d; } $("fit-c").value = p.c; }
-
-async function checkFit() {
-  const r = room($("fit-room").value);
-  const body = { model_id: model.model_id, w_ft: +$("fit-w").value, d_ft: +$("fit-d").value,
-                 clearance_ft: +$("fit-c").value, room_label: r.id }; // server matches id exactly
-  if (!(body.w_ft > 0 && body.d_ft > 0 && body.clearance_ft >= 0)) { $("fit-out").innerHTML = chip("warn", "ENTER A SIZE"); return; }
-  $("fit-go").disabled = true;
-  $("fit-out").innerHTML = `<span class="reason">Checking…</span>`;
-  try {
-    const res = await fetch(`${API}/query`, { method: "POST", headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify(body), signal: withTimeout(30000) });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    const fit = d.fit || {};
-    fitResult = { room: d.room || r.id, label: d.label || r.label, w_ft: body.w_ft, d_ft: body.d_ft, c_ft: body.clearance_ft,
-                  h_ft: PRESETS[preset].h || 2.5, name: PRESETS[preset].name, fits: fit.fits ?? null, reason: fit.reason || "",
-                  placement: fit.placement || null, paths: clearPaths(d.clear_path), errors: d.errors || [] };
-    showFitResult();
-  } catch (err) {
-    fitResult = null;
-    const msg = /unknown model_id/.test(err.message) ? "The server no longer has this model (restarted?). Re-upload the plan."
-      : `/query failed (${err.message}). Fit is only computed by the solver, never estimated here.`;
-    $("fit-out").innerHTML = `${chip("warn", "NOT CHECKED")}<div class="reason" style="margin-top:8px">${esc(msg)}</div>`;
-  } finally { $("fit-go").disabled = false; }
-}
-
-function showFitResult() {
-  const f = fitResult;
-  const verdict = f.fits === true ? chip("ok", "FITS") : f.fits === false ? chip("bad", "DOESN'T FIT") : chip("warn", "CAN'T TELL");
-  const blocked = f.paths.filter((p) => p.ok === false);
-  const pathLine = !f.paths.length ? "" : blocked.length
-    ? `${chip("bad", "BLOCKS PATH")} <span class="reason">${esc(blocked.map((p) => `${rname(p.from)}: ${p.reason}`).join(" · "))}</span>`
-    : f.paths.every((p) => p.ok === true) ? `${chip("ok", "PATH STAYS CLEAR")} <span class="reason">every bedroom still reaches the entrance (18 in)</span>` : "";
-  $("fit-out").innerHTML = `
-    <div class="score-row"><span style="font-weight:600">${esc(f.name)} · ${f.w_ft}×${f.d_ft} ft in ${esc(f.label)}</span>${verdict}</div>
-    <div class="reason" style="margin:8px 0">${esc(f.reason)}</div>
-    ${pathLine ? `<div style="margin-bottom:8px">${pathLine}</div>` : ""}
-    ${f.errors.length ? `<div class="reason">${esc(f.errors.map((e) => `${e.stage}: ${e.error}`).join(" · "))}</div>` : ""}
-    <button class="btn" id="fit-3d" style="margin-top:4px">View in 3D</button>`;
-  $("fit-3d").onclick = () => { go("3d"); show3dFurniture(); };
-  drawPlan($("plan-fit"), { anim: false });
-}
-
-function fitBox() { // object rectangle in px: the solver's placement, or (doesn't fit) the requested size at the room centre
-  const f = fitResult, s = model.scale_px_per_ft, r = room(f.room);
-  if (f.placement?.length) {
-    const xs = f.placement.map((p) => p[0]), ys = f.placement.map((p) => p[1]);
-    return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), placed: true };
-  }
-  if (!s || !r) return null;
-  const [cx, cy] = centroid(r.polygon), w = f.w_ft * s, d = f.d_ft * s;
-  return { x0: cx - w / 2, y0: cy - d / 2, x1: cx + w / 2, y1: cy + d / 2, placed: false };
-}
-function drawFitRect(svg) {
-  const b = fitBox(), f = fitResult;
-  f.paths.forEach((c) => c.path?.length > 1 &&
-    el("polyline", { points: c.path.map((q) => q.join(",")).join(" "), class: `cpath ${c.ok === false ? "bad" : ""}` }, svg));
-  if (!b) return;
-  const c = f.fits ? "var(--ok)" : "var(--bad)";
-  el("rect", { x: b.x0, y: b.y0, width: b.x1 - b.x0, height: b.y1 - b.y0, rx: 4, class: "fit-rect", fill: c, stroke: c,
-               "stroke-dasharray": b.placed ? "" : "8 5" }, svg);
-  const t = el("text", { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 + 5, "text-anchor": "middle", class: "rlabel", style: "opacity:1;animation:none" }, svg);
-  t.textContent = b.placed ? f.name : `${f.name}: doesn't fit`;
-}
-function show3dFurniture() {
-  const b = fitResult && fitBox(), s = model.scale_px_per_ft;
-  if (!b || !s || !window.Footprint3D) return;
-  try {
-    const kind = /bed/i.test(fitResult.name) ? "bed" : /sofa/i.test(fitResult.name) ? "sofa" : "box";
-    window.Footprint3D.showFurniture({ room: fitResult.room, fits: fitResult.fits, rotation_deg: 0, h_ft: fitResult.h_ft, kind, clearance_ft: fitResult.c_ft,
-      w_ft: (b.x1 - b.x0) / s, d_ft: (b.y1 - b.y0) / s, center_px: [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2] });
-  } catch (e) { console.warn("3D furniture failed", e); }
-}
-$("fit-go").onclick = checkFit;
-$("fit-sample").onclick = analyzeSample;
-
-// ---------------- voice ----------------
-// Mic → MediaRecorder → re-encoded to 16 kHz mono WAV (Gemini's documented audio list doesn't include webm)
-// → POST /voice {model_id, audio} → Hydrogen parses the intent → the same solver as /query.
-let rec = null, voiceMissing = false;
-const canVoice = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
-function voiceBtn(recording) {
-  $("fit-voice").classList.toggle("rec", recording);
-  $("fit-voice").textContent = recording ? "■ Stop · listening…" : "🎤 Ask by voice";
-}
-async function toggleVoice() {
-  if (rec) { rec.stop(); return; }
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch (err) {
-    $("fit-out").innerHTML = `${chip("warn", "MIC BLOCKED")}<div class="reason" style="margin-top:8px">Allow microphone access for this page, or type the size instead.</div>`;
-    return;
-  }
-  const chunks = [], r = new MediaRecorder(stream);
-  rec = r;
-  r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-  r.onstop = () => {
-    clearTimeout(r.cap); stream.getTracks().forEach((t) => t.stop());
-    rec = null; voiceBtn(false);
-    sendVoice(new Blob(chunks, { type: chunks[0]?.type || r.mimeType || "audio/webm" }));
-  };
-  r.start();
-  r.cap = setTimeout(() => r.state === "recording" && r.stop(), 8000); // hard cap: 8 s
-  voiceBtn(true);
-  $("fit-out").innerHTML = `<span class="reason">Listening… ask e.g. “Will a 7-foot sofa fit in the living room?” then press Stop.</span>`;
-}
-async function toWav(blob) {
-  const ctx = new AudioContext();
-  const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
-  ctx.close();
-  const rate = 16000, off = new OfflineAudioContext(1, Math.max(1, Math.ceil(audio.duration * rate)), rate);
-  const src = off.createBufferSource();
-  src.buffer = audio; src.connect(off.destination); src.start();
-  const pcm = (await off.startRendering()).getChannelData(0);
-  const v = new DataView(new ArrayBuffer(44 + pcm.length * 2));
-  const str = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
-  str(0, "RIFF"); v.setUint32(4, 36 + pcm.length * 2, true); str(8, "WAVE"); str(12, "fmt ");
-  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true);
-  v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data");
-  v.setUint32(40, pcm.length * 2, true);
-  pcm.forEach((s, i) => v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 0x7fff, true));
-  return new Blob([v], { type: "audio/wav" });
-}
-async function sendVoice(blob) {
-  $("fit-out").innerHTML = `<span class="reason">Understanding your question…</span>`;
-  $("fit-voice").disabled = true;
-  try {
-    let wav = null;
-    try { wav = await toWav(blob); } catch (e) { console.warn("WAV re-encode failed, sending original", e); }
-    const form = new FormData();
-    form.append("model_id", model.model_id);
-    form.append("audio", wav || blob, wav ? "question.wav" : "question.webm");
-    const res = await fetch(`${API}/voice`, { method: "POST", body: form, signal: withTimeout(30000) });
-    const d = await res.json().catch(() => ({}));
-    if (res.status === 404 && d.detail === "Not Found") { // route missing on this server → hide the mic
-      voiceMissing = true; $("fit-voice").hidden = true;
-      throw new Error("this server has no /voice endpoint");
-    }
-    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
-    const q = d.parsed_query || {}, heard = d.transcript_guess;
-    if (!d.fit) throw new Error((d.errors || []).map((e) => e.error).join(" · ") || "couldn't understand the question");
-    if (q.w_ft) $("fit-w").value = q.w_ft;
-    if (q.d_ft) $("fit-d").value = q.d_ft;
-    if (q.clearance_ft != null) $("fit-c").value = q.clearance_ft;
-    if (d.room) $("fit-room").value = d.room;
-    const obj = q.object || "your item";
-    fitResult = { room: d.room, label: d.label || rname(d.room), w_ft: q.w_ft, d_ft: q.d_ft, c_ft: q.clearance_ft,
-                  h_ft: /sofa|couch/.test(obj) ? 2.8 : /bed/.test(obj) ? 2 : 2.5, name: obj[0].toUpperCase() + obj.slice(1),
-                  fits: d.fit.fits ?? null, reason: d.fit.reason || "", placement: d.fit.placement || null,
-                  paths: clearPaths(d.path), errors: d.errors || [] };
-    showFitResult();
-    $("fit-out").insertAdjacentHTML("afterbegin", `<div class="reason" style="margin-bottom:8px">🎤 ${heard ? `Heard: “${esc(heard)}”` : "Voice question"}${
-      d.cost_usd != null ? ` · $${(+d.cost_usd).toFixed(4)}` : ""}${d.timings_ms?.hydrogen ? ` · ${(d.timings_ms.hydrogen / 1000).toFixed(1)} s` : ""}</div>`);
-  } catch (err) {
-    $("fit-out").innerHTML = `${chip("warn", "VOICE: NOT CHECKED")}<div class="reason" style="margin-top:8px">${esc(err.message)}. Type the size instead; fit is only computed by the solver.</div>`;
-  } finally { $("fit-voice").disabled = false; }
-}
-$("fit-voice").onclick = toggleVoice;
-
-// ---------------- proof / eval ----------------
-const SYS_ORDER = ["B0", "B1", "B2", "v1", "v2"];
-function fmtMetric(m, v) {
-  if (v == null) return "—";
-  return { pct: `${(v * 100).toFixed(1)}%`, pct_err: `${(+v).toFixed(1)}%`, ratio: (+v).toFixed(2), sec: `${(+v).toFixed(1)} s`,
-           usd: `$${(+v).toFixed(3)}`, num: (+v).toFixed(1) }[m.fmt] ?? String(v);
-}
-async function loadProof() {
-  let res = null, src = null;
-  for (const url of RESULTS) { try { res = await getJSON(url); src = url; break; } catch {} }
-  if (!res) { $("proof").innerHTML = `<div class="card reason">No results yet: run eval/run_eval.py.</div>`; return; }
-  const best = res.systems?.v2 && res.metrics.some((m) => m.v2 != null) ? "v2" : "v1";
-  const sysCols = SYS_ORDER.filter((s) => res.metrics.some((m) => m[s] != null));
-  const vp = res.headline?.verified_precision || {};
-  const pct = (v) => (v == null ? "—" : `${Math.round(v * 100)}%`);
-  const curve = res.coverage_curve || {};
-  const html = [];
-  if (res.placeholder) html.push(`<div class="placeholder-banner">PLACEHOLDER: not real results. Run eval/run_eval.py to replace (${esc(src)}).</div>`);
-  html.push(`<div class="section-head" style="margin:0"><span class="chip info">n = ${res.n_test} CubiCasa5K ${res.split === "dev" ? "DEV (tuning set, not the test set)" : "test"} plans · seed ${res.seed}</span>
-    <span class="chip">${esc(src.split("/").pop())}</span></div>`);
-  html.push(`<div class="grid2">
-    <div class="metric"><div class="head">${esc(res.systems?.[best]?.name || "Footprint")} ${chip("ok", "✓")}</div>
-      <div class="big ok">${pct(vp[best])}</div><div class="cap">right when it says VERIFIED</div>
-      ${vp.B1 != null && vp[best] != null ? `<div style="margin-top:10px">${chip("ok", `+${Math.round((vp[best] - vp.B1) * 100)} pts vs base`)}</div>` : ""}</div>
-    <div class="metric tint"><div class="head">${esc(res.systems?.B1?.name || "Baseline")}</div>
-      <div class="big base">${pct(vp.B1)}</div><div class="cap">right at confidence ≥ 0.8</div>
-      <div style="margin-top:10px">${chip("base", "Single Carbon call")}</div></div></div>`);
-  html.push(`<div class="card"><div class="verdict-text" style="font-size:20px;line-height:26px;margin:0">When Footprint says VERIFIED, it's right ${pct(vp[best])} <span class="muted">(baseline ${pct(vp.B1)})</span></div></div>`);
-  // benchmark bars
-  const bench = res.metrics.filter((m) => ["ratio", "pct", "pct_err"].includes(m.fmt)).map((m) => {
-    const a = m[best], b = m.B1, top = m.fmt === "pct_err" ? Math.max(a || 0, b || 0, 1) : 1;
-    return `<div class="bench"><div class="top-line"><span>${esc(m.label)} ${m.higher_is_better ? "" : chip("info", "Lower is better")}</span>
-      <span class="vals">${fmtMetric(m, a)} vs ${fmtMetric(m, b)}</span></div>
-      <div class="bar"><div style="width:${((a ?? 0) / top) * 100}%;background:var(--sys)"></div></div>
-      <div class="bar"><div style="width:${((b ?? 0) / top) * 100}%;background:var(--base)"></div></div></div>`;
-  }).join("");
-  html.push(`<div class="card"><div class="score-row"><div><h2 style="font-size:20px">Benchmark comparison</h2><div class="sub">${esc(res.systems?.[best]?.name)} vs ${esc(res.systems?.B1?.name)}</div></div>
-    <span class="mono" style="font-size:13px"><span class="dot" style="background:var(--sys)"></span>${best} <span class="dot" style="background:var(--base);margin-left:8px"></span>B1</span></div>${bench}</div>`);
-  // full table
-  html.push(`<div class="card"><h2>System vs baseline</h2><div class="table-wrap"><table><tr><th>Metric</th>${sysCols.map((s) => `<th>${s}</th>`).join("")}</tr>
-    ${res.metrics.map((m) => {
-      const vals = sysCols.map((s) => m[s]).filter((v) => v != null);
-      const bestV = m.higher_is_better ? Math.max(...vals) : Math.min(...vals);
-      return `<tr><td>${esc(m.label)}</td>${sysCols.map((s) => `<td class="${m[s] === bestV && vals.length > 1 ? "best" : ""}">${fmtMetric(m, m[s])}</td>`).join("")}</tr>`;
-    }).join("")}</table></div><div class="reason" style="margin-top:8px">IoU headline: ${esc(res.iou_headline || "raw")} (our polygons trace inner wall edges; ground truth follows wall centrelines).</div></div>`);
-  // per input type
-  html.push(`<div class="card"><h2>By input type</h2><div class="sub">Messy copies apply the same transform to the ground truth.</div><div class="table-wrap"><table>
-    <tr><th>Input</th><th>n</th><th>IoU B1</th><th>IoU ${best}</th><th>Verified B1</th><th>Verified ${best}</th></tr>
-    ${(res.by_variant || []).map((v) => `<tr><td>${esc(v.variant.replace("_", " "))}</td><td>${v.n}</td>
-      <td>${v.B1?.room_iou != null ? v.B1.room_iou.toFixed(2) : "—"}</td><td class="best">${v[best]?.room_iou != null ? v[best].room_iou.toFixed(2) : "—"}</td>
-      <td>${pct(v.B1?.verified_precision)}</td><td class="best">${pct(v[best]?.verified_precision)}</td></tr>`).join("")}</table></div></div>`);
-  // coverage vs accuracy
-  html.push(`<div class="card"><h2>Coverage vs accuracy</h2><div class="sub">Sweep the confidence threshold: how many rooms you answer for vs how often you're right.</div>${coverageSVG(curve, best)}</div>`);
-  // where it breaks
-  const maxF = Math.max(1, ...(res.failures || []).map((f) => f.count));
-  html.push(`<div class="card"><h2>Where it breaks</h2><div class="sub">Failure categories on DEV, auto-tagged.</div><div style="margin-top:8px">
-    ${(res.failures || []).map((f) => `<div class="fail-row"><div class="l1"><span class="cat">${esc(f.category)}</span>
-      <span>${f.fixed_in ? chip("ok", `FIXED IN ${f.fixed_in.toUpperCase()}`) : chip("warn", "OPEN")} <span class="mono" style="margin-left:6px">${f.count}</span></span></div>
-      <div class="bar" style="margin:8px 0 6px;height:6px"><div style="width:${(f.count / maxF) * 100}%;background:${f.fixed_in ? "var(--ok)" : "var(--warn)"}"></div></div>
-      <div class="reason">${esc(f.example)}</div></div>`).join("")}</div></div>`);
-  if (res.changes_v2?.length) html.push(`<div class="card"><h2>What we changed in v2</h2><div class="rows" style="margin-top:8px">
-    ${res.changes_v2.map((c) => `<div><span>${esc(c.change)}<br><span class="k mono" style="font-size:11px">${esc(c.category)}</span></span><span class="v" style="color:var(--sys)">${esc(c.delta)}</span></div>`).join("")}</div></div>`);
-  $("proof").innerHTML = html.join("");
-}
-function coverageSVG(curve, best) {
-  const W = 560, H = 260, L = 44, R = 16, T = 14, B = 36, y0 = 0.4;
-  const X = (c) => L + c * (W - L - R), Y = (a) => T + (1 - (a - y0) / (1 - y0)) * (H - T - B);
-  const line = (pts, color) => pts?.length ? `<polyline fill="none" stroke="${color}" stroke-width="2.5" points="${pts.map(([c, a]) => `${X(c)},${Y(a)}`).join(" ")}"/>` +
-    pts.map(([c, a]) => `<circle cx="${X(c)}" cy="${Y(a)}" r="3" fill="${color}"/>`).join("") : "";
-  let g = "";
-  for (let a = y0; a <= 1.0001; a += 0.1) g += `<line x1="${L}" x2="${W - R}" y1="${Y(a)}" y2="${Y(a)}" stroke="#e2e8f0"/><text x="${L - 8}" y="${Y(a) + 4}" text-anchor="end" font-size="11" font-family="JetBrains Mono" fill="#475569">${Math.round(a * 100)}%</text>`;
-  for (let c = 0.2; c <= 1.0001; c += 0.2) g += `<text x="${X(c)}" y="${H - B + 18}" text-anchor="middle" font-size="11" font-family="JetBrains Mono" fill="#475569">${Math.round(c * 100)}%</text>`;
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin-top:10px">${g}
-    <text x="${(W + L) / 2}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#475569" font-family="Inter">coverage (share of rooms answered)</text>
-    ${line(curve.B1, "#ffb95f")}${line(curve[best], "#006c49")}
-    <g font-family="JetBrains Mono" font-size="11"><circle cx="${L + 12}" cy="${T + 8}" r="4" fill="#006c49"/><text x="${L + 20}" y="${T + 12}">${best}</text>
-    <circle cx="${L + 52}" cy="${T + 8}" r="4" fill="#ffb95f"/><text x="${L + 60}" y="${T + 12}">B1</text></g></svg>`;
-}
-
-// ---------------- tabs & 3D ----------------
-function go(t) {
-  tab = t;
-  document.querySelectorAll("[data-tab]").forEach((s) => s.classList.toggle("active", s.dataset.tab === t));
-  document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("active", b.dataset.go === t));
-  if (t === "3d") build3d();
-  if (t === "eval") loadProof();
-  scrollTo({ top: 0 });
-}
-// Build 3D only when its tab is visible (a hidden container has 0 size), once per model; the swoop then plays on screen.
-function build3d() {
-  if (built3d === model) return;
-  try {
-    if (window.Footprint3D) { window.Footprint3D.build(model); built3d = model; }
-    else window.__pending3d = model;
-  } catch (err) { console.warn("3D build failed", err); }
-}
-document.querySelectorAll("#tabbar button").forEach((b) => (b.onclick = () => go(b.dataset.go)));
-$("file").addEventListener("change", (e) => e.target.files[0] && analyze(e.target.files[0]));
 
 (async () => {
-  const m = params.get("mock");
-  if (params.get("tab")) go(params.get("tab"));
-  if (m) { await loadMock(m === "noscale" ? "noscale" : "ok"); return; }
-  let live = false;
-  if (location.protocol === "file:") lastError = "page opened as a file; serve it (python3 -m http.server 5500) and open http://localhost:5500/frontend/";
-  try { await getJSON(`${API}/health`, { signal: withTimeout(6000) }); live = true; }
-  catch (err) { lastError = lastError || `backend not reachable at ${API} (${err.name === "AbortError" ? "no answer in 6 s" : err.message})`; }
-  // Backend up → open on a REAL result for the bundled sample plan (server caches it by image hash, so it's
-  // instant after the first run). Backend down → mock, clearly badged. analyze() itself falls back to the mock.
-  if (live) await analyzeSample();
-  else await loadMock("ok");
+  try { await api("/health", {}, 3000); $("health").textContent = "backend live"; $("health").className = "pill live"; }
+  catch { $("health").textContent = "backend offline"; $("health").className = "pill off"; }
+  if (params.get("mock")) { S.plan = await (await fetch("../samples/mock_model.json")).json(); S.planImg = "mock_plan.svg"; openApartment(); }
 })();
+
+// ================= listing =================
+$("plan-file").addEventListener("change", (e) => e.target.files[0] && analyzePlan(e.target.files[0]));
+$("plan-sample").onclick = async () => analyzePlan(new File([await (await fetch(SAMPLE_PLAN)).blob()], "synthetic_2br.png", { type: "image/png" }));
+$("new-plan").onclick = () => { $("app").hidden = true; $("empty").hidden = false; $("new-plan").hidden = true; $("plan-file").value = ""; };
+
+async function analyzePlan(file) {
+  showErr("e1", "");
+  const stop = stages($("p1"), ["Reading the plan", "Tracing rooms", "Checking each room", "Checking bedrooms"], 5500);
+  try {
+    const form = new FormData(); form.append("file", file);
+    const m = await api("/analyze", { method: "POST", body: form });
+    if (!m.rooms?.length) throw new Error(m.errors?.[0]?.error || "No rooms found on this image.");
+    S.plan = m; S.planImg = URL.createObjectURL(file); S.scans = {}; S.fit = null; S.built3d = null; S.videoOnly = false;
+    openApartment();
+    if (m.partial) pollFull(m.model_id);
+  } catch (err) { showErr("e1", `Couldn't read this plan: ${err.message}`); }
+  finally { stop(); }
+}
+async function pollFull(id) {                // /analyze returns a partial model at its 45 s deadline; the full one lands later
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    if (S.plan?.model_id !== id) return;
+    try { const m = await api(`/model/${id}`, {}, 5000); if (!m.partial) { S.plan = m; S.built3d = null; renderAll(); return; } } catch {}
+  }
+}
+// No floor plan: the filmed room is the whole model (same model.json shape), shown as "Your video".
+$("video-only").addEventListener("change", (e) => e.target.files[0] && scanOnly(e.target.files[0]));
+async function scanOnly(file) {
+  showErr("e1", ""); $("empty").hidden = false;
+  const stop = stages($("p1"), ["Uploading video", "Measuring walls", "Cross-checking", "Drawing the room"], 6000);
+  try {
+    const form = new FormData(); form.append("file", file);
+    const m = await api("/scan", { method: "POST", body: form }, 150000);
+    if (!m.rooms?.length) throw new Error(m.errors?.[0]?.error || "couldn't find a room in this video");
+    const img = m.image?.png_b64 ? `data:image/png;base64,${m.image.png_b64}` : null;
+    S.videoOnly = true; S.plan = m; S.planImg = img; S.scans = { [m.rooms[0].id]: { model: m, img } }; S.fit = null; S.built3d = null;
+    openApartment();
+  } catch (err) { showErr("e1", `Couldn't measure this video: ${err.message}. Tip: 15–30 s, pan slowly from a corner, door in frame.`); }
+  finally { stop(); $("video-only").value = ""; }
+}
+function openApartment() {
+  const rooms = sortedRooms();
+  S.sel = (rooms.find(isBedroom) || rooms[0])?.id || null; S.src = S.videoOnly ? "video" : "plan"; S.fit = null;
+  $("empty").hidden = true; $("app").hidden = false; $("new-plan").hidden = false;
+  renderAll();
+}
+function sortedRooms() { return [...(S.plan?.rooms || [])].sort((a, b) => isBedroom(b) - isBedroom(a)); }
+function planRoom(id = S.sel) { return S.plan?.rooms.find((r) => r.id === id); }
+function noScale(m = S.plan) { return !m || m.scale_status === "undetermined" || !m.scale_px_per_ft; }
+function bedEntry(id) { return (S.plan?.answers?.legal_bedrooms || []).find((b) => b.room === id); }
+function scanOf(id = S.sel) { return S.scans[id]; }
+
+function renderAll() { renderAnswers(); renderChips(); renderRoom(); renderCanvas(); }
+
+// ================= the three answers =================
+function setTile(id, cls, big, sub) { const t = $(id); t.className = `tile ${cls}`; t.querySelector(":scope > b").textContent = big; t.querySelector(":scope > span").textContent = sub; }
+function renderAnswers() {
+  if (S.videoOnly) return renderVideoAnswers();
+  const m = S.plan, a = m.answers || {}, bc = a.bedroom_count || {}, area = m.area || {};
+  const beds = a.legal_bedrooms || [], listed = bc.listed ?? m.listing_claim?.bedrooms ?? null;
+  $("headline").textContent = bc.headline || `${m.rooms.length} rooms on this plan`;
+  $("t-beds").querySelector("small").textContent = `Is it really a ${listed ?? beds.length}BR?`;
+  $("t-area").querySelector("small").textContent = "Is it really the size listed?";
+  // bedrooms: legal / failing / not yet confirmable, per bedroom
+  const legal = beds.filter((b) => effLegal(b) === true).length, bad = beds.filter((b) => effLegal(b) === false).length, unk = beds.length - legal - bad;
+  if (!beds.length) setTile("t-beds", "none", "No bedrooms labelled", "Nothing on the plan is called a bedroom.");
+  else if (bad) setTile("t-beds", "bad", `No: ${legal} of ${beds.length} legal`, `${bad} bedroom${bad > 1 ? "s" : ""} fail${bad > 1 ? "" : "s"} a NYC rule. Click it for why.`);
+  else if (!unk) setTile("t-beds", "ok", `Yes: ${legal} legal bedroom${legal > 1 ? "s" : ""}`, "Size, width, window and ceiling all check out.");
+  else setTile("t-beds", "warn", `${beds.length} bedroom${beds.length > 1 ? "s" : ""}, size OK so far`, `${unk} still need${unk > 1 ? "" : "s"} a check the plan can't answer (window or ceiling). Film the room.`);
+  // area
+  const measured = area.from_geometry ?? area.from_printed;
+  if (noScale()) setTile("t-area", "warn", "Can't measure", "No dimensions printed on this plan. Film a room to get real sizes.");
+  else if (!area.listing_claim) setTile("t-area", "none", `${n0(measured)} sq ft`, "measured from the plan · the listing gives no size");
+  else {
+    const ratio = area.listing_claim / measured;
+    if (area.claim_scope === "same_floor" && ratio > 1.1) setTile("t-area", "bad", `No: ${n0(measured)} sq ft`, `Listing says ${n0(area.listing_claim)} sq ft, ${Math.round((ratio - 1) * 100)}% more than the rooms add up to.`);
+    else if (Math.abs(ratio - 1) <= 0.1) setTile("t-area", "ok", `Yes: ${n0(measured)} sq ft`, `Listing says ${n0(area.listing_claim)} sq ft. Within 10%.`);
+    else setTile("t-area", "warn", `${n0(measured)} sq ft on this plan`, `Listing says ${n0(area.listing_claim)} sq ft; it may count other floors, so no verdict.`);
+  }
+  // ceilings: only a video can tell
+  const sc = Object.entries(S.scans).find(([, s]) => s.model.scan?.ceiling_ft);
+  if (sc) { const c = sc[1].model.scan.ceiling_ft, r = planRoom(sc[0]);
+    setTile("t-ceil", c.low >= 8 ? "ok" : c.high < 8 ? "bad" : "warn", `≈ ${f1(c.best)} ft`, `measured in ${r?.label || "your video"} (likely ${f1(c.low)}–${f1(c.high)} ft)`); }
+  else setTile("t-ceil", "none", "Not on the plan", "Floor plans never show it. Film a room to measure it.");
+}
+function renderVideoAnswers() {                // no floor plan: answer what one filmed room can answer
+  const r = S.plan.rooms[0], [big, small] = dimsSorted(r), c = S.plan.scan?.ceiling_ft;
+  $("headline").textContent = big && small ? `Room measured from your video: ${f1(big.best)} × ${f1(small.best)} ft` : "Room measured from your video";
+  $("t-beds").querySelector("small").textContent = "How many bedrooms?";
+  $("t-area").querySelector("small").textContent = "How big is this room?";
+  setTile("t-beds", "none", "Needs the floor plan", "Start over with the listing's floor plan to check how many legal bedrooms it really has.");
+  setTile("t-area", "none", r.area_sqft != null ? `≈ ${n0(r.area_sqft)} sq ft` : "—",
+          r.area_range_sqft ? `this room · likely ${n0(r.area_range_sqft[0])}–${n0(r.area_range_sqft[1])} sq ft` : "this room");
+  if (c) setTile("t-ceil", c.low >= 8 ? "ok" : c.high < 8 ? "bad" : "warn", `≈ ${f1(c.best)} ft`, `likely ${f1(c.low)}–${f1(c.high)} ft · NYC bedrooms need 8 ft`);
+  else setTile("t-ceil", "none", "Not visible", "Film the floor and ceiling to measure it.");
+}
+function ceilingOf(id) { return S.scans[id]?.model.scan?.ceiling_ft || null; }
+function effLegal(b) {                        // backend verdict, plus the ceiling check once a video measured it
+  if (b.legal === false) return false;
+  const c = ceilingOf(b.room);
+  if (c && c.high < 8) return false;
+  return b.legal === true ? true : null;
+}
+
+// ================= rooms =================
+function renderChips() {
+  $("chips").innerHTML = sortedRooms().map((r) => `<button data-id="${esc(r.id)}" class="${r.id === S.sel ? "on" : ""} ${isBedroom(r) ? "bed" : ""}">${esc(r.label)}</button>`).join("");
+  $("chips").querySelectorAll("button").forEach((b) => (b.onclick = () => selectRoom(b.dataset.id)));
+}
+function selectRoom(id) {                    // always allowed: an upload in progress stays attached to its own room
+  S.sel = id; S.src = "plan"; S.fit = null; renderChips(); renderRoom(); renderCanvas();
+}
+function renderRoom() {
+  const r = planRoom(); if (!r) { $("room").innerHTML = ""; return; }
+  const b = bedEntry(r.id), scan = scanOf(r.id);
+  const size = r.printed_dims_ft ? `${r.printed_dims_ft.map((d) => +(+d).toFixed(1)).join(" × ")} ft` : null;
+  let html = `<div class="rhead"><h3>${esc(r.label)}</h3>${b ? bedChip(b) : ""}</div>
+    <div class="rsub">${S.videoOnly ? "measured from your video · no floor plan" :
+      `${[size, r.area_sqft != null ? `${n0(r.area_sqft)} sq ft` : null].filter(Boolean).join(" · ") || "no dimensions on the plan"}
+      · outline ${r.verified ? "confirmed against the plan image" : "estimated"}`}</div>`;
+  if (b) html += bedroomSection(b, r);
+  html += measureSection(r, scan) + fitSection(r, scan);
+  $("room").innerHTML = html;
+  wireRoom(r);
+}
+function bedChip(b) {
+  const v = effLegal(b);
+  if (S.videoOnly) return v === false ? chip("bad", "TOO SMALL FOR A BEDROOM") : v === true ? chip("ok", "COULD BE A BEDROOM") : chip("warn", "NOT CONFIRMED YET");
+  return v === true ? chip("ok", "LEGAL BEDROOM") : v === false ? chip("bad", "NOT A LEGAL BEDROOM") : chip("warn", "NOT CONFIRMED YET");
+}
+function bedroomSection(b, r) {
+  const c = b.checks || {}, ms = b.measurements || {}, ceil = ceilingOf(r.id);
+  const mark = (v) => v === true ? `<span class="y">✓</span>` : v === false ? `<span class="n">✗</span>` : `<span class="q">?</span>`;
+  const bool = (v) => v === true ? true : v === false ? false : null;
+  const sq = ms.printed_sqft ?? ms.geometry_sqft ?? r.area_sqft;
+  const width = r.printed_dims_ft ? Math.min(...r.printed_dims_ft) : r.dims_ft ? Math.min(r.dims_ft.w?.best ?? Infinity, r.dims_ft.d?.best ?? Infinity) : null;
+  const win = c.exterior_window === true ? "yes" : c.exterior_window === false ? "none found" : "can't tell from plan";
+  const ceilOk = ceil ? (ceil.low >= 8 ? true : ceil.high < 8 ? false : null) : null;
+  return `<div class="sec"><h4>${S.videoOnly ? "Could this be a legal bedroom?" : "NYC legal bedroom?"}</h4><div class="chk">
+      ${mark(bool(c.area_ge_80))}<span>At least 80 sq ft</span><span class="v">${sq != null ? n0(sq) + " sq ft" : "—"}</span>
+      ${mark(bool(c.min_width_ge_8ft))}<span>At least 8 ft wide</span><span class="v">${width != null ? f1(width) + " ft" : "—"}</span>
+      ${mark(bool(c.exterior_window))}<span>Window to the outside</span><span class="v">${win}</span>
+      ${mark(ceilOk)}<span>Ceiling at least 8 ft</span><span class="v">${ceil ? `≈ ${f1(ceil.best)} ft` : "film the room ↓"}</span>
+    </div>${b.legal === false && b.reason ? `<div class="note">${esc(b.reason)}</div>` : ""}</div>`;
+}
+function measureSection(r, scan) {
+  let body;
+  if (S.scanning === r.id) body = `<div class="progress left" id="p2"></div><div class="note">You can keep looking at other rooms meanwhile.</div>`;
+  else if (S.scanning) body = `<div class="note" style="margin-top:0">Measuring ${esc(planRoom(S.scanning)?.label || "another room")} from your video… you can film this one next.</div>`;
+  else if (!scan) body = `<div class="note" style="margin-top:0">At the viewing, film this room for 15–30 s: stand in a corner, pan slowly,
+      keep the door in frame and show floor and ceiling.</div><div class="row"><button class="btn primary" id="scan-btn">📹 Upload a video of ${esc(r.label)}</button></div>`;
+  else body = scanResult(r, scan) + `<div class="row"><button class="btn small" id="scan-btn">Replace video</button></div>`;
+  return `<div class="sec"><h4>Measure it with your phone</h4>${body}<div class="error" id="e2" hidden></div></div>`;
+}
+function dimsSorted(room) { const d = room.dims_ft || {}; return [d.w, d.d].filter(Boolean).sort((a, b) => b.best - a.best); }
+function scanResult(r, scan) {
+  const sr = scan.model.rooms[0], [big, small] = dimsSorted(sr), ceil = scan.model.scan?.ceiling_ft, flags = sr.flags || [];
+  let cls = "info", title = `Measured: ${f1(big?.best)} × ${f1(small?.best)} ft`, sub = "";
+  const p = r.printed_dims_ft ? [...r.printed_dims_ft].sort((a, b) => b - a) : null;
+  if (S.videoOnly) { title = "Measured from your video"; sub = "No floor plan to compare with. Start over with the listing's plan to check it."; }
+  else if (p && big && small) {
+    const cmp = [[p[0], big], [p[1], small]].map(([pv, rg]) => pv > rg.high ? "over" : pv < rg.low ? "under" : "ok");
+    if (cmp.includes("over")) { cls = "bad"; title = "Smaller than the plan says"; }
+    else if (cmp.every((c) => c === "ok")) { cls = "ok"; title = "Matches the plan"; }
+    else { cls = "warn"; title = "Bigger than the plan says"; }
+    sub = `Plan ${+p[0].toFixed(1)} × ${+p[1].toFixed(1)} ft · your video ${f1(big.best)} × ${f1(small.best)} ft`;
+  } else if (r.area_sqft && sr.area_range_sqft) {
+    const [lo, hi] = sr.area_range_sqft;
+    cls = r.area_sqft > hi ? "bad" : r.area_sqft < lo ? "warn" : "ok";
+    title = r.area_sqft > hi ? "Smaller than the plan says" : r.area_sqft < lo ? "Bigger than the plan says" : "Matches the plan";
+    sub = `Plan ${n0(r.area_sqft)} sq ft · your video ${n0(sr.area_sqft)} sq ft`;
+  } else sub = "The plan prints no size for this room, so this video is now its measurement.";
+  const weak = { weak_reference_door: "the whole door", weak_reference_corners: "two corners", weak_reference_floor_ceiling: "floor and ceiling" };
+  const miss = Object.entries(weak).filter(([f]) => flags.includes(f)).map(([, t]) => t);
+  return `<div class="callout ${cls}"><b>${title}</b>${esc(sub)}</div>
+    <div class="kv" style="margin-top:10px">
+      <span>Width × depth</span><span class="v">${f1(big?.best)} × ${f1(small?.best)} ft (likely ${f1(big?.low)}–${f1(big?.high)} × ${f1(small?.low)}–${f1(small?.high)})</span>
+      <span>Floor area</span><span class="v">${n0(sr.area_sqft)} sq ft${sr.area_range_sqft ? ` (${n0(sr.area_range_sqft[0])}–${n0(sr.area_range_sqft[1])})` : ""}</span>
+      <span>Ceiling</span><span class="v">${ceil ? `≈ ${f1(ceil.best)} ft (${f1(ceil.low)}–${f1(ceil.high)})` : "not visible"}</span>
+    </div>
+    <div class="note">${flags.includes("two_model_disagree") ? "The two size estimates disagree, so treat this as rough. " : flags.includes("two_model_agree") ? "Two independent estimates agree. " : ""}
+      ${miss.length ? `For a tighter range, film ${miss.join(", ")}. ` : ""}Trust the range, not the single number. Switch the view to <b>Your video</b> to see the measured room.</div>`;
+}
+function fitSection(r, scan) {
+  const f = S.form;
+  const basisPlanOk = !noScale();
+  const usingVideo = S.src === "video" && scan;
+  let blocked = "";
+  if (!usingVideo && !basisPlanOk) blocked = scan ? "This plan has no dimensions. Switch the view to <b>Your video</b> to fit furniture in the measured room."
+                                                  : "This plan has no dimensions, so there's nothing to measure against. Film this room first (above).";
+  return `<div class="sec"><h4>Will it fit? <span class="chip plain">${usingVideo ? "in the room you filmed" : "using the plan"}</span></h4>
+    <div class="presets" id="presets">${PRESETS.map((p, i) => `<button data-i="${i}" class="${f.preset === i ? "on" : ""}">${p.name}</button>`).join("")}</div>
+    <div class="row">
+      <label class="field">Width ft<input type="number" id="fit-w" step="0.1" min="0.5" value="${f.w}"></label>
+      <label class="field">Depth ft<input type="number" id="fit-d" step="0.1" min="0.5" value="${f.d}"></label>
+      <label class="field">Walkway ft<input type="number" id="fit-c" step="0.5" min="0" value="${f.c}"></label>
+      <button class="btn primary" id="fit-go" ${blocked ? "disabled" : ""}>Check fit</button>
+      <button class="btn" id="voice-btn" title="e.g. 'Will a 7-foot sofa fit in the living room?'">${S.busy === "voice" ? "■ Stop & ask" : "🎙 Ask"}</button>
+    </div>
+    ${blocked ? `<div class="callout warn">${blocked}</div>` : ""}
+    <div id="fit-res">${S.fit && S.fit.room === r.id ? fitHTML(S.fit) : ""}</div><div class="error" id="e3" hidden></div></div>`;
+}
+function fitHTML(f) {
+  const head = f.fits === true ? chip("ok", "FITS") : f.fits === false ? chip("bad", "DOESN'T FIT") : chip("warn", "CAN'T TELL");
+  const path = f.path?.ok === true ? `${chip("ok", "WAY OUT CLEAR")} every bedroom can still reach the entrance`
+             : f.path?.ok === false ? `${chip("bad", "BLOCKS THE WAY OUT")} ${esc(f.path.reason || "")}` : "";
+  return `<div class="callout ${f.fits === true ? "ok" : f.fits === false ? "bad" : "warn"}" style="margin-top:10px">
+    ${f.heard ? `<div class="note" style="margin:0 0 4px">Heard: “${esc(f.heard)}”</div>` : ""}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="display:inline">${f.w_ft} × ${f.d_ft} ft</b>${head}</div>
+    <div class="note" style="margin-top:4px">${esc(f.reason || "")}</div>${path ? `<div class="note">${path}</div>` : ""}</div>`;
+}
+function wireRoom(r) {
+  const sb = $("scan-btn"); if (sb) sb.onclick = () => { const inp = S.videoOnly ? $("video-only") : $("scan-file"); inp.value = ""; inp.click(); };
+  $("presets")?.querySelectorAll("button").forEach((b) => (b.onclick = () => { const p = PRESETS[+b.dataset.i]; S.form = { ...p, preset: +b.dataset.i }; renderRoom(); }));
+  ["fit-w", "fit-d", "fit-c"].forEach((id) => $(id)?.addEventListener("input", () => {
+    S.form = { ...S.form, w: +$("fit-w").value, d: +$("fit-d").value, c: +$("fit-c").value, preset: null };
+    $("presets").querySelectorAll("button").forEach((b) => b.classList.remove("on")); }));
+  $("fit-go") && ($("fit-go").onclick = checkFit);
+  $("voice-btn") && ($("voice-btn").onclick = voice);
+  if (S.scanning === r.id && $("p2") && S.stopScan?.el !== $("p2")) { S.stopScan?.();
+    S.stopScan = Object.assign(stages($("p2"), ["Uploading video", "Measuring walls", "Cross-checking", "Drawing the room"], 6000), { el: $("p2") }); }
+}
+
+// ================= video scan (attached to the selected room) =================
+$("scan-file").addEventListener("change", (e) => e.target.files[0] && scanRoom(e.target.files[0]));
+async function scanRoom(file) {
+  const roomId = S.sel; S.scanning = roomId; renderRoom();
+  try {
+    const form = new FormData(); form.append("file", file);
+    const m = await api("/scan", { method: "POST", body: form }, 150000);
+    if (!m.rooms?.length) throw new Error(m.errors?.[0]?.error || "couldn't find a room in this video");
+    S.scans[roomId] = { model: m, img: m.image?.png_b64 ? `data:image/png;base64,${m.image.png_b64}` : null };
+    S.scanning = null; S.stopScan?.(); S.stopScan = null;
+    if (S.sel === roomId) { S.fit = null; S.src = "video"; }   // only switch the view if you're still on that room
+    renderAll();
+  } catch (err) {
+    S.scanning = null; S.stopScan?.(); S.stopScan = null; renderRoom();
+    if (S.sel === roomId) showErr("e2", `Couldn't measure this video: ${err.message}. Tip: 15–30 s, pan slowly from a corner, door in frame.`);
+  }
+}
+
+// ================= canvas: floor plan or your video, 2D or 3D =================
+$("src").querySelectorAll("button").forEach((b) => (b.onclick = () => {
+  if (b.disabled) return;
+  if (b.dataset.src === "video" && !scanOf()) {            // this room isn't filmed: jump to the room that is
+    const filmed = Object.keys(S.scans)[0]; if (!filmed) return;
+    S.sel = filmed; renderChips();
+  }
+  S.src = b.dataset.src; S.fit = null; renderRoom(); renderCanvas();
+}));
+$("dim").querySelectorAll("button").forEach((b) => (b.onclick = () => { S.view = b.dataset.v; renderCanvas(); }));
+function current() {                           // what the canvas shows and what "Will it fit?" checks against
+  const scan = scanOf();
+  if (S.src === "video" && scan) return { m: scan.model, img: scan.img, room: scan.model.rooms[0], video: true };
+  return { m: S.plan, img: S.planImg, room: planRoom(), video: false };
+}
+function renderCanvas() {
+  const scan = scanOf(), vb = $("src").querySelector('[data-src="video"]');
+  $("src").hidden = !!S.videoOnly;                 // no floor plan: nothing to switch between
+  const filmed = Object.keys(S.scans)[0];            // "Your video" stays clickable once any room is filmed
+  vb.disabled = !filmed; vb.title = filmed ? "" : "Upload a room video first";
+  vb.textContent = scan ? `Your video · ${planRoom()?.label || "room"}` : filmed ? `Your video · ${planRoom(filmed)?.label || "room"}` : "Your video";
+  if (!scan && S.src === "video") S.src = "plan";
+  $("src").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.src === S.src));
+  $("dim").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === S.view));
+  const { m, img, room, video } = current();
+  const cad = S.view === "3d" && video;                       // a filmed room in 3D = the interactive CAD model
+  $("planbox").hidden = S.view !== "2d"; $("view3d").hidden = S.view !== "3d" || cad; $("cad3d").hidden = !cad; $("cad-agent").hidden = !cad;
+  $("canvas-hint").textContent = cad ? "Interactive CAD · drag furniture" : video ? "Measured from your video" : "Click a room";
+  if (S.view === "2d") return drawPlan($("plan"), m, img, room?.id, S.fit && S.fit.room === S.sel && S.fit.video === video ? S.fit : null, !video);
+  try { render3d(m, room, video, cad); }
+  catch (err) {                                            // a 3D failure must never freeze the toggles: fall back to 2D
+    console.error("3D view failed:", err);
+    S.view = "2d"; renderCanvas(); $("canvas-hint").textContent = "3D view hit an error, showing 2D. Reload the page to retry 3D.";
+  }
+}
+function render3d(m, room, video, cad) {
+  const mod = cad ? window.FootprintCAD : window.Footprint3D;
+  if (!mod) {                                              // 3D module still loading (CDN): retry for ~12 s, then give up
+    S.wait3d = (S.wait3d || 0) + 1;
+    if (S.wait3d > 40) throw new Error("3D library didn't load");
+    return setTimeout(() => S.view === "3d" && renderCanvas(), 300);
+  }
+  S.wait3d = 0;
+  if (cad) {
+    const f = S.fit && S.fit.room === S.sel && S.fit.video ? S.fit : null;
+    return window.FootprintCAD.show(m, f ? { ...f, label: f.name || "your furniture" } : null);
+  }
+  const f = S.fit && S.fit.room === S.sel && S.fit.video === video ? S.fit : null;
+  const key = f ? JSON.stringify([f.room, f.w_ft, f.d_ft, f.fits, f.center_px, f.rotation_deg]) : "";
+  if (S.built3d !== m) { window.Footprint3D.build(m); S.built3d = m; S.key3d = null; }
+  if (S.key3d === key) return;                 // nothing changed: no rebuild, no camera swoop
+  S.key3d = key;
+  window.Footprint3D.clearFurniture();
+  if (f && m.scale_px_per_ft) window.Footprint3D.showFurniture({ room: room.id, fits: f.fits, w_ft: f.w_ft, d_ft: f.d_ft, h_ft: 2,
+    center_px: f.center_px || (f.poly ? centroid(f.poly) : null), rotation_deg: f.rotation_deg || 0 });
+  window.Footprint3D.overview();
+}
+function roomClass(m, r, selId) {
+  if (r.id === selId) return "sel";
+  const b = (m.answers?.legal_bedrooms || []).find((x) => x.room === r.id);
+  return b && effLegal(b) === false ? "fail" : r.verified ? "ok" : "est";
+}
+function centroid(poly) {
+  let a = 0, x = 0, y = 0;
+  for (let i = 0; i < poly.length; i++) { const [x0, y0] = poly[i], [x1, y1] = poly[(i + 1) % poly.length], c = x0 * y1 - x1 * y0; a += c; x += (x0 + x1) * c; y += (y0 + y1) * c; }
+  if (Math.abs(a) < 1e-6) { const n = poly.length; return [poly.reduce((s, p) => s + p[0], 0) / n, poly.reduce((s, p) => s + p[1], 0) / n]; }
+  return [x / (3 * a), y / (3 * a)];
+}
+function drawPlan(svg, m, img, selId, fit, clickable) {
+  const { w, h } = m.image, fs = Math.max(11, Math.min(w, h) / 38);
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  let s = img ? `<image href="${img}" x="0" y="0" width="${w}" height="${h}"/>` : "";
+  const order = [...m.rooms].sort((a, b) => (a.id === selId) - (b.id === selId));   // selected drawn last (on top)
+  for (const r of order) {
+    if (!r.polygon?.length) continue;
+    const tip = `${r.label}${r.area_sqft != null ? ` · ${n0(r.area_sqft)} sq ft` : ""}`;
+    s += `<polygon class="room ${roomClass(m, r, selId)}" data-id="${esc(r.id)}" points="${r.polygon.map((p) => p.join(",")).join(" ")}"><title>${esc(tip)}</title></polygon>`;
+  }
+  if (m.entrance) s += `<circle cx="${m.entrance[0]}" cy="${m.entrance[1]}" r="${fs * 0.55}" fill="var(--accent)" stroke="#fff" stroke-width="3"><title>Entrance</title></circle>`;
+  if (fit?.poly) { const c = fit.fits ? "var(--ok)" : "var(--bad)";
+    s += `<polygon class="fitrect" points="${fit.poly.map((p) => p.join(",")).join(" ")}" fill="${c}" stroke="${c}" ${fit.fits ? "" : 'stroke-dasharray="8 6"'}/>`; }
+  svg.innerHTML = s;
+  if (clickable) svg.querySelectorAll(".room").forEach((p) => (p.onclick = () => selectRoom(p.dataset.id)));
+}
+
+// ================= fit =================
+async function checkFit() {
+  const { m, room, video } = current(); showErr("e3", "");
+  const q = { w_ft: +$("fit-w").value, d_ft: +$("fit-d").value, clearance_ft: +$("fit-c").value };
+  if (!m?.model_id || !room) return showErr("e3", "Upload a plan first.");
+  $("fit-res").innerHTML = `<div class="note">Checking…</div>`;
+  try {
+    const res = await api("/query", { method: "POST", headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ model_id: m.model_id, room_label: room.label, ...q }) }, 30000);
+    setFit(res.fit, res.clear_path, q, m, room, video);
+  } catch (err) { $("fit-res").innerHTML = ""; showErr("e3", `Fit check failed: ${err.message}`); }
+}
+function setFit(fit, path, q, m, room, video, heard) {
+  fit = fit || {};
+  let poly = fit.placement || null;
+  if (!poly && room?.polygon && m.scale_px_per_ft) {   // doesn't fit: show the requested size at the room centre, in red
+    const [cx, cy] = centroid(room.polygon), w = q.w_ft * m.scale_px_per_ft / 2, d = q.d_ft * m.scale_px_per_ft / 2;
+    poly = [[cx - w, cy - d], [cx + w, cy - d], [cx + w, cy + d], [cx - w, cy + d]];
+  }
+  S.fit = { room: S.sel, video, fits: fit.fits, reason: fit.reason, poly, path, heard, w_ft: q.w_ft, d_ft: q.d_ft,
+            name: S.form.preset != null ? PRESETS[S.form.preset].name : "your furniture",
+            center_px: fit.center_px, rotation_deg: fit.rotation_deg };
+  renderRoom(); renderCanvas();
+}
+
+// ================= voice =================
+let rec = null, chunks = [];
+async function voice() {
+  const { m } = current(); showErr("e3", "");
+  if (rec) { rec.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    chunks = []; rec = new MediaRecorder(stream); S.busy = "voice"; renderRoom();
+    rec.ondataavailable = (e) => chunks.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop()); const type = rec.mimeType; rec = null; S.busy = null; renderRoom();
+      $("fit-res").innerHTML = `<div class="note">Listening…</div>`;
+      try {
+        const form = new FormData(); form.append("model_id", m.model_id);
+        form.append("audio", await toWav(new Blob(chunks, { type: type || "audio/webm" })), "question.wav");
+        const res = await api("/voice", { method: "POST", body: form }, 60000);
+        const q = res.parsed_query || {};
+        if (res.room && m === S.plan && res.room !== S.sel) { S.sel = res.room; renderChips(); }
+        if (q.w_ft) S.form = { w: q.w_ft, d: q.d_ft, c: q.clearance_ft, preset: null };
+        if (!res.fit) { renderRoom(); $("fit-res").innerHTML = `<div class="callout warn">Heard “${esc(res.transcript_guess || "?")}”. ${esc(res.errors?.[0]?.error || "")}</div>`; return; }
+        const cur = current();
+        setFit(res.fit, res.path, { w_ft: q.w_ft, d_ft: q.d_ft }, cur.m, cur.room, cur.video, res.transcript_guess);
+      } catch (err) { renderRoom(); showErr("e3", `Voice question failed: ${err.message}`); }
+    };
+    rec.start();
+    setTimeout(() => { if (rec && rec.state === "recording") rec.stop(); }, 10000);   // never leave the mic running
+  } catch (err) { S.busy = null; renderRoom(); showErr("e3", `Microphone unavailable: ${err.message}`); }
+}
+async function toWav(blob) {                  // browser recordings are webm/ogg; send 16 kHz mono WAV, which every model accepts
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const buf = await ctx.decodeAudioData(await blob.arrayBuffer()); ctx.close();
+  const rate = 16000, src = buf.getChannelData(0), step = buf.sampleRate / rate, n = Math.floor(src.length / step);
+  const pcm = new Int16Array(n);
+  for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, src[Math.floor(i * step)])); pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
+  const hd = new DataView(new ArrayBuffer(44)), put = (o, s) => [...s].forEach((c, i) => hd.setUint8(o + i, c.charCodeAt(0)));
+  put(0, "RIFF"); hd.setUint32(4, 36 + n * 2, true); put(8, "WAVE"); put(12, "fmt "); hd.setUint32(16, 16, true); hd.setUint16(20, 1, true);
+  hd.setUint16(22, 1, true); hd.setUint32(24, rate, true); hd.setUint32(28, rate * 2, true); hd.setUint16(32, 2, true); hd.setUint16(34, 16, true);
+  put(36, "data"); hd.setUint32(40, n * 2, true);
+  return new Blob([hd.buffer, pcm.buffer], { type: "audio/wav" });
+}
 </script>
-<script type="module" src="three3d.js"></script>
+<!-- ?v= stamps make browsers fetch the current 3D modules instead of a cached older copy -->
+<script type="module" src="three3d.js?v=1622"></script>
+<script type="module" src="cad3d.js?v=1622"></script>
+<script>
+document.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => {
+  const [label, w, d, h] = b.dataset.add.split("|"); if (!window.FootprintCAD) return;
+  remember(); window.FootprintCAD.add({ label, w: +w, d: +d, h: +h });
+}));
+// ===== agent: plain English (+ a screenshot of the view) -> Gemini picks walls/positions -> cad3d.js places them
+// exactly -> deterministic check -> if cramped, the agent suggests fixes. Options / fixes are one-click; Undo steps back.
+const CAD = () => window.FootprintCAD, undoStack = [];
+function remember() { undoStack.push(CAD().snapshot()); if (undoStack.length > 20) undoStack.shift(); $("cad-undo").disabled = false; }
+$("cad-undo").onclick = () => { const s = undoStack.pop(); if (s) CAD().restore(s); $("cad-undo").disabled = !undoStack.length; sayHTML(`<div>Undone.</div>`); };
+function sayHTML(html, append = false) { const b = $("cad-say"); b.hidden = false; b.innerHTML = append ? b.innerHTML + html : html; }
+async function askAgent(text, issues = [], withShot = true) {   // fix requests skip the screenshot: lighter, faster
+  return api("/cad_agent", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, ...CAD().describe(), image_b64: withShot ? CAD().screenshot() : null, issues }) }, 100000);
+}
+async function critic() {          // after any change: check deterministically; if cramped, ask for fixes
+  const issues = CAD().check();
+  if (!issues.length) return sayHTML(`<div class="ok-line">✓ No overlaps, the door swings clear, walkways are 2 ft or more.</div>`, true);
+  const top = [...issues].sort((a, b) => /overlaps|door|out of the room/.test(b) - /overlaps|door|out of the room/.test(a));   // hard problems first
+  sayHTML(`<div class="warn-line">${issues.length} problem${issues.length > 1 ? "s" : ""}: ${top.slice(0, 3).map(esc).join("; ")}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ""}. Looking for fixes…</div>`, true);
+  try {
+    const res = await askAgent("The layout has the problems listed. Suggest alterations that fix them.", issues.slice(0, 4), false);
+    const sug = res.suggestions?.length ? res.suggestions : res.actions?.length ? [{ text: res.say || "Suggested fix", actions: res.actions }] : [];
+    if (!sug.length) return sayHTML(`<div class="note">No fix suggested. Try moving the red pieces by hand.</div>`, true);
+    sayHTML(`<div class="sugs"><b>Suggested fixes</b>${sug.map((s, i) => `<div class="opt"><button data-sug="${i}">Apply</button><span>${esc(s.text)}</span></div>`).join("")}</div>`, true);
+    $("cad-say").querySelectorAll("[data-sug]").forEach((b) => (b.onclick = async () => {
+      remember(); CAD().apply(sug[+b.dataset.sug].actions);
+      sayHTML(`<div>Applied: ${esc(sug[+b.dataset.sug].text)}</div>`); await critic();
+    }));
+  } catch (err) { sayHTML(`<div class="note">Couldn't get fixes: ${esc(err.message)}</div>`, true); }
+}
+$("cad-ask").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("cad-text").value.trim();
+  if (!text || !CAD()) return;
+  sayHTML(`<div class="note">Thinking… (looking at your 3D view)</div>`);
+  const base = CAD().snapshot();
+  try {
+    const res = await askAgent(text);          // the checker runs after the change (critic)
+    if (res.error) throw new Error(res.error);
+    $("cad-text").value = "";
+    if (res.options?.length) {     // other arrangements: preview any of them; each starts from the layout you had
+      sayHTML(`<div>${esc(res.say || "Here are some other ways to arrange this room:")}</div><div class="sugs">` +
+        res.options.map((o, i) => `<div class="opt"><button data-opt="${i}">${esc(o.name)}</button><span>${esc(o.why)}</span></div>`).join("") + `</div>`);
+      $("cad-say").querySelectorAll("[data-opt]").forEach((b) => (b.onclick = async () => {
+        remember(); CAD().restore(base); CAD().apply(res.options[+b.dataset.opt].actions);
+        const keep = $("cad-say").innerHTML.split('<div class="ok-line">')[0].split('<div class="warn-line">')[0];
+        sayHTML(keep); await critic();
+      }));
+      return;
+    }
+    if (res.actions?.length) { remember(); CAD().apply(res.actions); }
+    sayHTML(`<div>${esc(res.say || (res.actions?.length ? "Done." : "I couldn't turn that into furniture changes."))}</div>`);
+    if (res.actions?.length) await critic();
+  } catch (err) { sayHTML(`<div class="note">Couldn't do that: ${esc(err.message)}</div>`); }
+};
+</script>
 </body>
 </html>

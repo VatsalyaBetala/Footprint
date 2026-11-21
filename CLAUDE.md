@@ -1,14 +1,20 @@
 # Footprint — Gemini 4 NYC Hackathon
 
 ## Idea
-HEADLINE: "Is that 2BR actually a 2BR?" — NYC listings, verified.
-Any apartment floor plan image → a verified digital model you can query.
-Carbon reads labels/dimensions/doors, OpenCV traces exact room shapes, the
-Decisions API verifies each room against the original image, Neon picks repairs
-for failures, and an alignment score climbs live. Deterministic solvers then
-answer: true square footage (two independent methods), furniture fit with
-clearance, clear path to the entrance. 3D view in Three.js. Optional: Shopify
-products that actually fit.
+HEADLINE: "Is that 2BR actually a 2BR?" — NYC listings, checked against reality.
+One flow, three steps (frontend/index.html is a single page in this order):
+1. CHECK THE LISTING — floor plan image → rooms, real sq ft vs claim, every bedroom
+   checked against NYC minimums (80 sq ft, 8 ft wide, exterior window). One verdict.
+2. MEASURE A ROOM — 15–30 s phone video at the viewing (backend/scan.py, POST /scan)
+   → width × depth ranges + ceiling height, compared with the plan's printed size.
+   Fills the check a plan can't answer (ceiling ≥ 8 ft).
+3. FIT YOUR FURNITURE — any plan or scanned room → furniture placed with walkway
+   clearance, out of door swings, path to the entrance still clear (POST /query,
+   voice via POST /voice). 2D + 3D view.
+Pipeline (unchanged): Carbon reads semantics, OpenCV traces shapes, Decisions checks
+outlines, Neon picks repairs, deterministic solvers answer. AI internals (decision
+probabilities, alignment score) stay in model.json for eval but are NOT shown in the
+UI; the UI shows one trust mark per room (confirmed / estimate) and honest ranges.
 
 Problem Statement 1 (5 Sigma). Eval on 50 random CubiCasa5K plans vs a
 single-Carbon-call baseline.
@@ -109,11 +115,12 @@ null when there is no claim. Never call area overstated unless claim_scope = "sa
 - `samples/mock_model.json` must always match the contract.
 
 ## Demo (3 min)
-1. Judge gives any listing floor plan.
-2. Rooms appear, alignment score climbs.
-3. Lead with a surprise answer (area overstated / bed doesn't fit).
-4. 3D orbit.
-5. One slide: system vs baseline + where it breaks + what we fixed.
+1. Step 1: judge's floor plan (or samples/synthetic_2br.png) → verdict + bedroom cards.
+2. Step 2: room video (scratch/videos/cad_bedroom.mp4 = 12×10 ft) → "Bedroom 1 matches
+   the plan", ceiling height fills the bedroom card.
+3. Step 3: king bed → doesn't fit (needs 12.3 × 9.7 ft) → 3D dollhouse; ask by voice.
+4. One slide: measured accuracy (room scan: 12% mean error, truth inside range 3/3 on
+   CAD rooms of known size) + where it breaks (no printed dims → no scale; Finnish labels).
 
 ## Impact upgrades (priority order)
 1. Legal bedroom check (solvers.py, deterministic): every room labeled bedroom must have

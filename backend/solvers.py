@@ -108,10 +108,11 @@ def legal_bedrooms(rooms, windows, scale):
 def fit(room, w_ft, d_ft, clearance_ft, doors, scale):
     """Place a w×d object (back to a wall) with clearance on its other 3 sides.
 
-    Grid search in 3 in steps over 4 orientations (back to top/bottom/left/right =
-    rotations 0/90 and their mirrors). Valid = object+clearance inside the room and
-    object clear of door swings. Returns the first valid spot, preferring one whose
-    back is against a wall. placement = object rectangle in px (no clearance).
+    Grid search in 3 in steps over 8 orientations: back to the top/bottom/left/right wall with the
+    w side along the wall ("standard"), then the same four turned 90° so the d side runs along the wall
+    ("sideways"; e.g. a 7×3 sofa needs 13×6 ft standard but only 9×10 ft sideways). Valid = object +
+    clearance inside the room and object clear of door swings. Preference: standard against a wall,
+    then sideways against a wall, then anything valid. placement = object rectangle in px (no clearance).
     """
     poly = _poly(room)
     if not scale or poly.is_empty:
@@ -123,7 +124,12 @@ def fit(room, w_ft, d_ft, clearance_ft, doors, scale):
     wall = poly.boundary.buffer(step)
     x0, y0, x1, y1 = poly.bounds
     fallback, door_blocked = None, False
-    for fw, fh, ob, (b0, b1) in _layouts(w_ft * scale, d_ft * scale, clearance_ft * scale):
+    w, d, c = w_ft * scale, d_ft * scale, clearance_ft * scale
+    layouts = [(lay, "standard") for lay in _layouts(w, d, c)]
+    if abs(w_ft - d_ft) > 1e-9:  # a square object turned 90° is the same footprint
+        layouts += [(lay, "sideways") for lay in _layouts(d, w, c)]
+    turned = f" (turned sideways: its {d_ft:g} ft side along the wall)"
+    for (fw, fh, ob, (b0, b1)), orient in layouts:
         for x in _steps(x0, x1 - fw, step):
             for y in _steps(y0, y1 - fh, step):
                 foot = box(x, y, x + fw, y + fh)
@@ -135,17 +141,25 @@ def fit(room, w_ft, d_ft, clearance_ft, doors, scale):
                     continue
                 back = LineString([(x + b0[0], y + b0[1]), (x + b1[0], y + b1[1])])
                 if back.difference(wall).length <= 0.1 * back.length:
-                    return {"fits": True, "placement": _coords(obj),
-                            "reason": f"fits against a wall with {clearance_ft:g} ft clearance on 3 sides"}
-                fallback = obj if fallback is None else fallback
+                    return {"fits": True, "placement": _coords(obj), "orientation": orient,
+                            "orientations_tried": len(layouts),
+                            "reason": f"fits against a wall with {clearance_ft:g} ft clearance on 3 sides"
+                                      + (turned if orient == "sideways" else "")}
+                fallback = (obj, orient) if fallback is None else fallback
     if fallback is not None:
-        return {"fits": True, "placement": _coords(fallback),
-                "reason": f"fits with {clearance_ft:g} ft clearance on 3 sides, but not against a wall"}
+        return {"fits": True, "placement": _coords(fallback[0]), "orientation": fallback[1],
+                "orientations_tried": len(layouts),
+                "reason": f"fits with {clearance_ft:g} ft clearance on 3 sides, but not against a wall"
+                          + (turned if fallback[1] == "sideways" else "")}
     long_, short = (s / scale for s in _rect_sides(poly))
-    why = ("every spot that fits inside the walls is blocked by a door swing" if door_blocked else
-           f"needs {w_ft + 2 * clearance_ft:.1f} × {d_ft + clearance_ft:.1f} ft ({w_ft:g} × {d_ft:g} ft"
-           f" + {clearance_ft:g} ft clearance on 3 sides); room is {long_:.1f} × {short:.1f} ft")
-    return {"fits": False, "placement": None, "reason": why}
+    need = f"needs {w_ft + 2 * clearance_ft:.1f} × {d_ft + clearance_ft:.1f} ft"
+    if len(layouts) > 4:
+        need += f", or {d_ft + 2 * clearance_ft:.1f} × {w_ft + clearance_ft:.1f} ft turned sideways"
+    why = (f"every spot that fits inside the walls is blocked by a door swing (tried {len(layouts)} orientations)"
+           if door_blocked else
+           f"tried {len(layouts)} orientations: {need} ({w_ft:g} × {d_ft:g} ft + {clearance_ft:g} ft clearance"
+           f" on 3 sides); room is {long_:.1f} × {short:.1f} ft")
+    return {"fits": False, "placement": None, "orientation": None, "orientations_tried": len(layouts), "reason": why}
 
 
 def clear_path(rooms, doors, entrance, scale, obstacles=None):

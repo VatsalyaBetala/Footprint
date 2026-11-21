@@ -6,6 +6,8 @@ Deps: requirements.txt (python-multipart is needed for uploads).
 POST /analyze   multipart "file" = plan image -> model.json  (hard deadline 45 s -> partial model)
 POST /query     JSON {"model_id", "w_ft", "d_ft", "clearance_ft", "room_label"} -> fit + clear path
 POST /voice     multipart "audio" (wav/ogg/webm) + "model_id" -> Hydrogen intent -> same as /query
+POST /scan      multipart "file" = walkthrough video (video/*, <=100 MB) -> scan.scan_video -> model.json with
+                "source": "video_scan" (hard deadline 120 s -> 504 + partial; never cached)
 GET  /model/{model_id}, GET /health (modules, startup warm-up per model)
 
 Stage interfaces (img = decoded BGR array from cv2, the same pixels parse.py sent to Carbon).
@@ -27,6 +29,7 @@ import copy
 import glob
 import hashlib
 import importlib
+import inspect
 import json
 import logging
 import math
@@ -62,6 +65,10 @@ NEON = "gemini-4-neon"
 HYDROGEN = "gemini-4-hydrogen"
 DECISIONS = "models/gemini-decision-1"
 ANALYZE_TIMEOUT_S = float(os.environ.get("ANALYZE_TIMEOUT_S", 45))  # hard deadline for /analyze -> partial model
+SCAN_TIMEOUT_S = float(os.environ.get("SCAN_TIMEOUT_S", 120))  # hard deadline for /scan -> 504 + partial result
+SCAN_MAX_BYTES = 100 * 1024 * 1024
+VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
+SCAN_RANGE_TOO_WIDE = "measurement range too wide to judge — film the door and corners"
 HYDROGEN_TIMEOUT_MS = 30_000
 WARMUP_TIMEOUT_MS = 20_000
 VOICE_PROMPT = """You turn ONE spoken question about fitting furniture in an apartment into JSON.
@@ -260,6 +267,132 @@ def voice(model_id: str = Form(...), audio: UploadFile = File(...)):
     model["answers"]["custom_query"] = {**out, "query": q}
     _save_model(model)
     return JSONResponse(out)
+
+
+@app.post("/scan")
+def scan_video_endpoint(file: UploadFile = File(...)):
+    """Walkthrough video -> generated plan + rooms with measured dims_ft RANGES -> the same solvers.
+    Never cached (each video is a fresh scan); stored under model_id so /query and /voice work on it.
+    Interface expected from backend/scan.py:
+      scan_video(video_path[, partial: dict]) -> {
+        "rooms": [{"id", "label", "polygon" (px in the generated plan), "dims_ft": {"w": [lo, hi], "d": [lo, hi]}
+                   (or [[lo, hi], [lo, hi]]), "method": "video_scan", "flags"?, "verified"?, "confidence"?}],
+        "scale_px_per_ft", "image": BGR ndarray of the generated plan | {"png_b64", "w"?, "h"?},
+        "doors"?, "windows"? (with on_exterior_wall), "entrance"?, "scale_status"?, "usage"?, "timings_ms"?}
+    If scan_video takes `partial`, it should fill that dict as it goes; a timeout returns whatever is in it."""
+    try:
+        scan = importlib.import_module("scan")  # lazy: a missing / mid-edit scan.py never breaks the server
+    except Exception as e:
+        log.warning("scan unavailable: %s: %s", type(e).__name__, e)
+        return JSONResponse({"error": "scan unavailable", "detail": f"{type(e).__name__}: {e}"[:200]}, status_code=503)
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if not ((file.content_type or "").startswith("video/") or ext in VIDEO_EXTS):
+        return JSONResponse({"error": f"send a video (video/*) as multipart field 'file'; got {file.content_type!r}"},
+                            status_code=415)
+    data = file.file.read(SCAN_MAX_BYTES + 1)
+    if not data:
+        return JSONResponse({"error": "empty video upload"}, status_code=400)
+    if len(data) > SCAN_MAX_BYTES:
+        return JSONResponse({"error": f"video over {SCAN_MAX_BYTES // (1024 * 1024)} MB"}, status_code=413)
+    scan_key = "scan_" + _cache_key(data)   # same video bytes + same backend code -> the earlier clean result
+    hit = _cache_get(scan_key)
+    if hit is not None:
+        log.info("scan cache hit %s -> %s", scan_key, hit["model_id"])
+        return JSONResponse({**hit, "cached": True, "answers": {**hit.get("answers", {}), "custom_query": None}})
+    fd, path = tempfile.mkstemp(suffix=ext if ext in VIDEO_EXTS else ".mp4")
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+
+    model = {**_empty_model(uuid.uuid4().hex[:12]), "source": "video_scan"}
+    model["timings_ms"] = {"scan": 0, "solvers": 0}
+    partial, state = {}, {"result": None, "error": None}
+    try:
+        takes_partial = "partial" in inspect.signature(scan.scan_video).parameters
+    except (TypeError, ValueError, AttributeError):
+        takes_partial = False
+
+    def work():
+        try:
+            state["result"] = scan.scan_video(path, partial=partial) if takes_partial else scan.scan_video(path)
+        except Exception as e:
+            log.exception("scan_video failed")
+            state["error"] = f"{type(e).__name__}: {e}"[:300]
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    t = time.perf_counter()
+    worker = threading.Thread(target=work, daemon=True, name=f"scan-{model['model_id']}")
+    worker.start()
+    worker.join(SCAN_TIMEOUT_S)
+    model["timings_ms"]["scan"] = round((time.perf_counter() - t) * 1000)
+    status = 200
+    if worker.is_alive():  # hard timeout: answer with whatever scan_video has published so far
+        status, model["partial"] = 504, True
+        snap = {k: (list(v) if isinstance(v, list) else v) for k, v in list(partial.items())}
+        model["errors"].append({"stage": "timeout", "error": f"scan exceeded {SCAN_TIMEOUT_S:g} s; " + (
+            "returning the partial result" if snap.get("rooms") else "no partial result available")})
+        res = snap if snap.get("rooms") else None
+    elif state["error"]:
+        model["errors"].append({"stage": "scan", "error": state["error"]})
+        res = None
+    elif not (isinstance(state["result"], dict) and isinstance(state["result"].get("rooms"), list)):
+        model["errors"].append({"stage": "scan", "error": f"scan_video returned {type(state['result']).__name__}, "
+                                                          "need dict with 'rooms'"})
+        res = None
+    else:
+        res = state["result"]
+    if res is not None:
+        _run(model, "scan.assemble", _scan_assemble, model, res)
+        _scan_solve(model)
+    model = _jsonable(model)
+    if status == 200:
+        _store(model, scan_key)  # saved by model_id (for /query, /voice); in the upload cache only if clean and complete
+    else:
+        _save_model(model)
+    out = model
+    log.info("scan %s: status %d, %d rooms, partial=%s, timings %s, errors %d", out["model_id"], status,
+             len(out["rooms"]), out["partial"], out["timings_ms"], len(out["errors"]))
+    return JSONResponse(out, status_code=status)
+
+
+class AgentIn(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+    walls: list[dict] = []
+    furniture: list[dict] = []
+    image_b64: str | None = Field(default=None, max_length=4_000_000)   # JPEG screenshot of the 3D view
+    issues: list[str] = []                                              # checker findings -> agent suggests fixes
+
+
+@app.post("/cad_agent")
+def cad_agent(q: AgentIn):
+    """Plain-English furniture request -> placement actions for the CAD view (agent.py; model picks walls, never coordinates)."""
+    # cache identical requests (same words, room, furniture, problems; NOT the screenshot) so rehearsed demo
+    # commands replay instantly; anything new goes live to Gemini. Invalidated by any backend code change.
+    akey = hashlib.sha256(json.dumps([q.text.strip().lower(), q.walls, q.furniture, q.issues], sort_keys=True).encode()).hexdigest()[:24]
+    apath = os.path.join(MODEL_DIR, f"agent_{akey}_{PIPELINE_VERSION}.json")
+    try:
+        with open(apath) as f:
+            log.info("cad_agent cache hit %s", akey)
+            return JSONResponse({**json.load(f), "cached": True})
+    except (OSError, ValueError):
+        pass
+    try:
+        import agent  # lazy: a missing / mid-edit agent.py never breaks the server
+        out = _jsonable(agent.plan_actions(_genai(), q.text, q.walls, q.furniture, q.image_b64, q.issues))
+        if out.get("actions") or out.get("options") or out.get("suggestions"):
+            try:
+                os.makedirs(MODEL_DIR, exist_ok=True)
+                with open(apath, "w") as f:
+                    json.dump(out, f)
+            except OSError as e:
+                log.warning("could not cache agent reply: %s", e)
+        return JSONResponse(out)
+    except Exception as e:
+        log.exception("cad_agent failed")
+        return JSONResponse({"actions": [], "say": "", "error": f"{type(e).__name__}: {e}"[:300]})
 
 
 # ---------- pipeline ----------
@@ -552,6 +685,186 @@ def _find_room(rooms, label):
 
     best = max(rooms, key=score, default=None)
     return best if best is not None and any(score(best)[:2]) else None
+
+
+# ---------- video scan ----------
+
+def _scan_assemble(model, res):
+    """model.json fields from a scan_video result (explicit, JSON-safe fields only)."""
+    scale = res.get("scale_px_per_ft")
+    scale = float(scale) if isinstance(scale, (int, float)) and scale > 0 else None
+    model["scale_px_per_ft"] = round(scale, 3) if scale else None
+    raw = res.get("scale_status")  # scan.py says "estimated": px/ft is its render scale, lengths are estimates
+    model["scale_status"] = (raw if raw in ("ok", "low_confidence", "undetermined") else "low_confidence") if scale \
+        else "undetermined"
+    model["scale_basis"] = raw
+    model["image"] = _scan_image(res)
+    rooms = []
+    for i, r in enumerate(res.get("rooms") or []):
+        r = {**r, "id": r.get("id") or f"r{i + 1}"}
+        rng = _dims_range(r.get("dims_ft"))
+        out = _room_out({**r, "printed_dims_ft": None}, scale)  # measured from video, never "printed"
+        out["method"] = r.get("method") or "video_scan"
+        out["dims_ft"] = rng
+        out["area_range_sqft"] = [round(rng["w"]["low"] * rng["d"]["low"], 1),
+                                  round(rng["w"]["high"] * rng["d"]["high"], 1)] if rng else None
+        rooms.append(out)
+    model["rooms"] = rooms
+    model["doors"] = _jsonable(res.get("doors") or [])
+    model["windows"] = _jsonable(res.get("windows") or [])
+    model["entrance"] = _jsonable(res.get("entrance"))
+    model["furniture"] = _jsonable(res.get("furniture") or [])
+    model["scan"] = _jsonable(res.get("scan") or {})  # duration, closure error, references used, ceiling, ...
+    model["scan_flags"] = _jsonable(res.get("flags") or [])
+    model["errors"] += [{"stage": f"scan.{e.get('stage') or 'scan'}", "error": e.get("error")}
+                        for e in res.get("errors") or [] if isinstance(e, dict)]
+    model["alignment_score_history"] = _jsonable(res.get("alignment_score_history") or [])
+    model["decision_checks"] = _jsonable(res.get("decision_checks") or [])
+    usage = res.get("usage") if isinstance(res.get("usage"), dict) else {}
+    parts = {f"scan:{name}": (_token_cost(name, u) if isinstance(u, dict) else None) for name, u in usage.items()}
+    if isinstance(res.get("cost_usd"), (int, float)):
+        parts["scan"] = res["cost_usd"]
+    model["cost_breakdown"] = parts
+    model["cost_usd"] = round(sum(v for v in parts.values() if isinstance(v, (int, float))), 5)
+    for k, v in (res.get("timings_ms") or {}).items():  # scan's own stage timings, e.g. frames / reconstruct
+        if isinstance(v, (int, float)) and k not in model["timings_ms"]:
+            model["timings_ms"][k] = round(v)
+
+
+def _scan_image(res):
+    """{"w", "h", "png_b64"} of the generated plan (the frontend's base image), or None."""
+    im = res.get("image")
+    if isinstance(im, np.ndarray):
+        ok, buf = cv2.imencode(".png", im)
+        return {"w": int(im.shape[1]), "h": int(im.shape[0]),
+                "png_b64": base64.b64encode(buf.tobytes()).decode() if ok else None}
+    b64 = im.get("png_b64") if isinstance(im, dict) else res.get("png_b64")
+    if not isinstance(b64, str):
+        return None
+    w, h = (im.get("w"), im.get("h")) if isinstance(im, dict) else (None, None)
+    if not (w and h):
+        dec = cv2.imdecode(np.frombuffer(base64.b64decode(b64), np.uint8), cv2.IMREAD_UNCHANGED)
+        w, h = (int(dec.shape[1]), int(dec.shape[0])) if dec is not None else (None, None)
+    return {"w": w, "h": h, "png_b64": b64}
+
+
+def _dims_range(d):
+    """{"w": {"low", "best", "high"}, "d": {...}} in ft. Each side may be {"low", "best", "high"} (scan.py), [lo, hi],
+    or one number (exact); the whole thing may also be [[lo, hi], [lo, hi]]. None if malformed."""
+    def num(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+
+    if isinstance(d, dict):
+        d = [d.get("w"), d.get("d")]
+    if not (isinstance(d, (list, tuple)) and len(d) == 2):
+        return None
+    out = {}
+    for key, side in zip(("w", "d"), d):
+        if isinstance(side, dict):
+            lo, best, hi = side.get("low"), side.get("best"), side.get("high")
+        elif isinstance(side, (list, tuple)) and len(side) == 2:
+            lo, best, hi = side[0], None, side[1]
+        else:
+            lo = best = hi = side
+        if not (num(lo) and num(hi)) or (best is not None and not num(best)):
+            return None
+        lo, hi = float(min(lo, hi)), float(max(lo, hi))
+        out[key] = {"low": round(lo, 2), "best": round(float(best) if best is not None else (lo + hi) / 2, 2),
+                    "high": round(hi, 2)}
+    return out
+
+
+def _scan_solve(model):
+    """Same solvers as /analyze; legal bedrooms use the interval rule on measured ranges."""
+    rooms, doors, scale, ans = model["rooms"], model["doors"], model["scale_px_per_ft"], model["answers"]
+    area = _run(model, "solvers.compute_area", solvers.compute_area, rooms, scale) or {}
+    ranges = [r["area_range_sqft"] for r in rooms if r.get("area_range_sqft")]
+    model["area"] = {"from_printed": None, "from_geometry": area.get("from_geometry"), "listing_claim": None,
+                     "claim_scope": None, "agree": None, "printed_coverage": area.get("printed_coverage"),
+                     "from_video_range": [round(sum(a for a, _ in ranges), 1), round(sum(b for _, b in ranges), 1)]
+                     if ranges else None, "video_range_coverage": [len(ranges), len(rooms)]}
+    ans["legal_bedrooms"] = _run(model, "solvers.legal_bedrooms", _legal_interval, rooms, model["windows"], scale) or []
+    paths = _run(model, "solvers.clear_path", solvers.clear_path, rooms, doors, model["entrance"], scale)
+    ans["clear_path"] = _path_summary(paths) if paths is not None else None
+    # same candidates as the legal check: labelled bedrooms, else the filmed room ("Scanned room") itself
+    beds = [r for r in rooms if solvers._is_bedroom(r)] or [r for r in rooms if r.get("method") == "video_scan"]
+    ans["king_bed_fits"] = _run(model, "solvers.king_bed_fits", _king_bed,
+                                [{**b, "label": f"{b.get('label')} (bedroom)"} for b in beds], doors, scale)
+    ans["bedroom_count"] = _run(model, "solvers.headline", _scan_headline, ans["legal_bedrooms"])
+
+
+def _legal_interval(rooms, windows, scale):
+    """Legal-bedroom check on measured RANGES (method video_scan), conservative both ways:
+    legal=False only if even the HIGH end fails (hi_w*hi_d < 80 or min(hi_w, hi_d) < 8);
+    legal=True only if even the LOW end passes (lo_w*lo_d >= 80, min(lo_w, lo_d) >= 8) AND an exterior window is
+    confirmed; otherwise None. Rooms from another method (none today) go through the normal plan solver.
+    Candidates: rooms labelled as bedrooms; if none is, every scanned room (scan.py films ONE room and labels it
+    "Scanned room": the filmed room IS the bedroom in question)."""
+    out = []
+    cands = [r for r in rooms if solvers._is_bedroom(r)]
+    judged_as = "labelled_bedroom"
+    if not cands:
+        cands, judged_as = [r for r in rooms if r.get("method") == "video_scan"], "scanned_room"
+    for r in cands:
+        if r.get("method") != "video_scan":
+            out += solvers.legal_bedrooms([r], windows, scale)
+            continue
+        win = solvers._has_exterior_window(solvers._poly(r), windows, scale)
+        checks = {"area_ge_80": None, "min_width_ge_8ft": None, "exterior_window": win,
+                  "ceiling_height": "not_checkable_from_plan"}
+        rng, entry = r.get("dims_ft"), {"room": r["id"], "label": r.get("label"), "measurement_source": "video_range",
+                                        "judged_as": judged_as}
+        if not rng:
+            out.append({**entry, "legal": None, "checks": checks, "reason": "no measurement range from the video",
+                        "range": None})
+            continue
+        (lw, hw), (ld, hd) = (rng["w"]["low"], rng["w"]["high"]), (rng["d"]["low"], rng["d"]["high"])
+        lo_a, hi_a, lo_m, hi_m = lw * ld, hw * hd, min(lw, ld), min(hw, hd)
+        checks["area_ge_80"] = True if lo_a >= solvers.MIN_BEDROOM_SQFT else (
+            False if hi_a < solvers.MIN_BEDROOM_SQFT else "range_straddles_threshold")
+        checks["min_width_ge_8ft"] = True if lo_m >= solvers.MIN_BEDROOM_WIDTH_FT else (
+            False if hi_m < solvers.MIN_BEDROOM_WIDTH_FT else "range_straddles_threshold")
+        if hi_a < solvers.MIN_BEDROOM_SQFT or hi_m < solvers.MIN_BEDROOM_WIDTH_FT:
+            legal = False
+            reason = "; ".join(s for s in (
+                f"at most {hi_a:.0f} sq ft < {solvers.MIN_BEDROOM_SQFT} sq ft minimum" if hi_a < solvers.MIN_BEDROOM_SQFT else "",
+                f"at most {hi_m:.1f} ft wide < {solvers.MIN_BEDROOM_WIDTH_FT} ft minimum" if hi_m < solvers.MIN_BEDROOM_WIDTH_FT else "") if s)
+        elif lo_a >= solvers.MIN_BEDROOM_SQFT and lo_m >= solvers.MIN_BEDROOM_WIDTH_FT:
+            legal = True if win is True else None
+            reason = (f"at least {lo_a:.0f} sq ft and {lo_m:.1f} ft wide, exterior window "
+                      "(ceiling height not checkable from plan)") if win is True else (
+                f"size passes even at the low end, but {solvers.WINDOW_MSG.get(win, 'exterior window not confirmed')}")
+        else:
+            legal, reason = None, SCAN_RANGE_TOO_WIDE
+        out.append({**entry, "legal": legal, "checks": checks, "reason": reason,
+                    "range": {"w_ft": [lw, hw], "d_ft": [ld, hd], "area_sqft": [round(lo_a, 1), round(hi_a, 1)]}})
+    return out
+
+
+def _scan_headline(legal):
+    """Same interval rule: a legal count only when every bedroom got a verdict; otherwise a neutral line.
+    One filmed room that isn't labelled a bedroom gets a room-level line instead of a 'shows 1BR' count."""
+    n, judged = len(legal), [b for b in legal if b["legal"] is not None]
+    out = {"listed": None, "labelled": n, "legal": None, "not_legal": None, "not_judged": n - len(judged)}
+    if n == 1 and legal[0].get("judged_as") == "scanned_room":
+        b = legal[0]
+        verdict = {True: "legal bedroom", False: "not a legal bedroom"}.get(b["legal"], "can't judge yet")
+        head = f"{b['label']} → {verdict}" + ("" if b["legal"] is True else f" ({b['reason']})")
+        kind = "legal" if b["legal"] is not None else "neutral"
+        return {**out, "legal": int(b["legal"] is True) if kind == "legal" else None,
+                "not_legal": int(b["legal"] is False) if kind == "legal" else None, "kind": kind, "headline": head}
+    if legal and len(judged) == n:
+        ok = sum(b["legal"] is True for b in legal)
+        bad = n - ok
+        head = f"Scan shows {n}BR → legally {ok}BR" + (
+            "" if not bad else " + home office" if bad == 1 else f" + {bad} non-legal rooms")
+        return {**out, "legal": ok, "not_legal": bad, "kind": "legal", "headline": head}
+    head = f"Scan shows {n or 'no'} bedroom{'' if n == 1 else 's'}"
+    if n - len(judged):
+        head += f"; {n - len(judged)} can't be judged yet"
+        if any(b["reason"] == SCAN_RANGE_TOO_WIDE for b in legal):
+            head += " — film the door and corners"
+    return {**out, "kind": "neutral", "headline": head}
 
 
 # ---------- models: warm-up + voice ----------

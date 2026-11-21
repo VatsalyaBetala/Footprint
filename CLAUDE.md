@@ -26,11 +26,13 @@ single-Carbon-call baseline.
 - Person B — `frontend/`, `eval/`: UI, overlay, score, 3D, eval + baseline, Shopify
 - Shared — `CLAUDE.md`, `samples/`. Change the contract only together.
 
-## Models (fill in from client.models.list())
-- CARBON = "gemini-4-carbon"        # ⚠️ verify ID — plan reading, semantics
-- NEON = "gemini-4-neon"            # ⚠️ verify ID — repair choice
-- DECISIONS = "gemini-decision-1"   # per-room verification (noul/choice/score)
-- SDK: google-genai >= 3.2.0, client with http_options={"api_version": "v1beta"}
+## Models (verified via client.models.list() + live calls, Nov 21)
+- CARBON = "gemini-4-carbon"        # ✅ verified — plan reading, semantics
+- NEON = "gemini-4-neon"            # ✅ verified — repair choice
+- HYDROGEN = "gemini-4-hydrogen"    # ✅ verified — voice intent parser
+- DECISIONS = "gemini-decision-1"   # ✅ verified — per-room verification (noul/choice/score)
+- Also listed, unused: "gemini-4-argon"
+- SDK: google-genai >= 3.2.0 (3.6.1 installed), client with http_options={"api_version": "v1beta"}
 - Decisions API is AI Studio (Developer API) only, not Vertex.
 
 ## Pipeline

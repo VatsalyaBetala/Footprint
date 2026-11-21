@@ -7,3 +7,7 @@
 - Changes: cropped to the ground-floor 2D plan and its "Ground Floor 1395 sq.ft." header
   (pixels x 0–645, y 15–490 of the 1300×929 original), saved as PNG.
 - This image remains under CC BY-SA 4.0. It is not covered by the repository's code license.
+
+## synthetic_2br.png
+- Synthetic 2BR / 1BA test plan drawn programmatically with OpenCV by the Footprint team during the event
+  (30 px/ft, 30 ft × 24 ft apartment). No third-party content; same license as this repository.

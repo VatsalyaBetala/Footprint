@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="600" viewBox="0 0 760 600">
+<rect width="760" height="600" fill="#ffffff"/>
+<rect x="32" y="32" width="696.0" height="536.0" fill="#2a2a2a"/>
+<polygon points="40,40 440,40 440,300 40,300" fill="#fbf8f1"/>
+<polygon points="450,40 720,40 720,300 450,300" fill="#fbf8f1"/>
+<polygon points="40,310 230,310 230,560 40,560" fill="#fbf8f1"/>
+<polygon points="240,310 360,310 360,470 240,470" fill="#fbf8f1"/>
+<polygon points="240,480 360,480 360,560 240,560" fill="#fbf8f1"/>
+<polygon points="370,380 528,380 528,560 370,560" fill="#fbf8f1"/>
+<polygon points="370,310 720,310 720,560 538,560 538,370 370,370" fill="#fbf8f1"/>
+<rect x="100" y="300" width="100" height="10" fill="#fbf8f1"/>
+<rect x="370" y="300" width="70" height="10" fill="#fbf8f1"/>
+<rect x="560" y="300" width="60" height="10" fill="#fbf8f1"/>
+<rect x="360" y="340" width="10" height="50" fill="#fbf8f1"/>
+<rect x="420" y="370" width="50" height="10" fill="#fbf8f1"/>
+<rect x="720" y="440" width="16" height="60" fill="#fbf8f1"/>
+<rect x="120" y="32" width="80" height="8" fill="#cfe6f5" stroke="#5a8fb5"/>
+<rect x="280" y="32" width="80" height="8" fill="#cfe6f5" stroke="#5a8fb5"/>
+<rect x="540" y="32" width="80" height="8" fill="#cfe6f5" stroke="#5a8fb5"/>
+<rect x="32" y="400" width="8" height="80" fill="#cfe6f5" stroke="#5a8fb5"/>
+<path d="M420,380 L470,380 A50,50 0 0,0 420,330" fill="none" stroke="#888" stroke-width="1.5"/>
+<path d="M720,440 L660,440 A60,60 0 0,0 720,500" fill="none" stroke="#888" stroke-width="1.5"/>
+<text x="240.0" y="166.0" font-family="Helvetica,Arial" font-size="13" font-weight="700" text-anchor="middle" fill="#333">LIVING</text>
+<text x="585.0" y="166.0" font-family="Helvetica,Arial" font-size="13" font-weight="700" text-anchor="middle" fill="#333">BEDROOM 1</text>
+<text x="135.0" y="431.0" font-family="Helvetica,Arial" font-size="13" font-weight="700" text-anchor="middle" fill="#333">KITCHEN</text>
+<text x="300.0" y="386.0" font-family="Helvetica,Arial" font-size="13" font-weight="700" text-anchor="middle" fill="#333">BATH</text>
+<text x="300.0" y="516.0" font-family="Helvetica,Arial" font-size="13" font-weight="700" text-anchor="middle" fill="#333">CLOSET</text>
+<text x="449.0" y="466.0" font-family="Helvetica,Arial" font-size="13" font-weight="700" text-anchor="middle" fill="#333">BEDROOM 2</text>
+<text x="630" y="416" font-family="Helvetica,Arial" font-size="13" font-weight="700" text-anchor="middle" fill="#333">HALL</text>
+<text x="40" y="588" font-family="Helvetica,Arial" font-size="13" fill="#333">2 BR / 1 BA · MOCK PLAN, NO DIMENSIONS (synthetic, for UI development)</text>
+</svg>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Footprint</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">Footprint <span>Is that 2BR actually a 2BR?</span></div>
+    <div class="controls">
+      <label class="btn">Upload plan<input id="file" type="file" accept="image/*" hidden></label>
+      <button id="replay" class="btn ghost">Replay</button>
+      <span id="source" class="badge"></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div id="headline" class="headline"></div>
+      <div class="plan-wrap">
+        <svg id="plan" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="tip" class="tip" hidden></div>
+      </div>
+      <div class="score">
+        <div class="score-label">Alignment score</div>
+        <div class="score-bar"><div id="score-fill"></div></div>
+        <div id="score-num" class="score-num">–</div>
+        <div id="score-steps" class="score-steps"></div>
+      </div>
+      <div class="view3d-wrap">
+        <div class="view3d-bar">
+          <span class="score-label">3D · drag to orbit · click a room to step inside</span>
+          <button id="view3d-reset" class="btn ghost small">Overview</button>
+        </div>
+        <div id="view3d">
+          <div id="view3d-caption" class="view3d-caption" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="card"><h3>Square footage</h3><div id="area"></div></div>
+      <div class="card"><h3>Answers</h3><div id="answers"></div></div>
+      <div class="card"><h3>Legal bedrooms</h3><div id="legal"></div></div>
+      <div class="card"><h3>Rooms</h3><div id="rooms"></div></div>
+      <div class="card"><h3>Decision checks</h3><div id="decisions"></div></div>
+      <div class="card meta" id="meta"></div>
+    </aside>
+  </main>
+
+  <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+  </script>
+  <script src="app.js"></script>
+  <script type="module" src="three3d.js"></script>
+</body>
+</html>

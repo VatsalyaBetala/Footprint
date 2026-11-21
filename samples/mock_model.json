@@ -1,0 +1,510 @@
+{
+ "image": {
+  "w": 760,
+  "h": 600
+ },
+ "scale_px_per_ft": 20.0,
+ "scale_status": "ok",
+ "rooms": [
+  {
+   "id": "r1",
+   "label": "Living",
+   "polygon": [
+    [
+     40,
+     40
+    ],
+    [
+     440,
+     40
+    ],
+    [
+     440,
+     300
+    ],
+    [
+     40,
+     300
+    ]
+   ],
+   "printed_dims_ft": [
+    20.0,
+    13.0
+   ],
+   "area_sqft": 260.0,
+   "verified": true,
+   "confidence": 0.95,
+   "flags": []
+  },
+  {
+   "id": "r2",
+   "label": "Bedroom 1",
+   "polygon": [
+    [
+     450,
+     40
+    ],
+    [
+     720,
+     40
+    ],
+    [
+     720,
+     300
+    ],
+    [
+     450,
+     300
+    ]
+   ],
+   "printed_dims_ft": [
+    13.5,
+    13.0
+   ],
+   "area_sqft": 175.5,
+   "verified": true,
+   "confidence": 0.96,
+   "flags": []
+  },
+  {
+   "id": "r3",
+   "label": "Kitchen",
+   "polygon": [
+    [
+     40,
+     310
+    ],
+    [
+     230,
+     310
+    ],
+    [
+     230,
+     560
+    ],
+    [
+     40,
+     560
+    ]
+   ],
+   "printed_dims_ft": [
+    9.5,
+    12.5
+   ],
+   "area_sqft": 118.8,
+   "verified": true,
+   "confidence": 0.93,
+   "flags": []
+  },
+  {
+   "id": "r4",
+   "label": "Bath",
+   "polygon": [
+    [
+     240,
+     310
+    ],
+    [
+     360,
+     310
+    ],
+    [
+     360,
+     470
+    ],
+    [
+     240,
+     470
+    ]
+   ],
+   "printed_dims_ft": [
+    6.0,
+    8.0
+   ],
+   "area_sqft": 48.0,
+   "verified": true,
+   "confidence": 0.91,
+   "flags": []
+  },
+  {
+   "id": "r5",
+   "label": "Closet",
+   "polygon": [
+    [
+     240,
+     480
+    ],
+    [
+     360,
+     480
+    ],
+    [
+     360,
+     560
+    ],
+    [
+     240,
+     560
+    ]
+   ],
+   "printed_dims_ft": null,
+   "area_sqft": 24.0,
+   "verified": false,
+   "confidence": 0.52,
+   "flags": [
+    "stops_at_walls_failed"
+   ]
+  },
+  {
+   "id": "r6",
+   "label": "Bedroom 2",
+   "polygon": [
+    [
+     370,
+     380
+    ],
+    [
+     528,
+     380
+    ],
+    [
+     528,
+     560
+    ],
+    [
+     370,
+     560
+    ]
+   ],
+   "printed_dims_ft": [
+    7.9,
+    9.0
+   ],
+   "area_sqft": 71.1,
+   "verified": true,
+   "confidence": 0.94,
+   "flags": []
+  },
+  {
+   "id": "r7",
+   "label": "Hall",
+   "polygon": [
+    [
+     370,
+     310
+    ],
+    [
+     720,
+     310
+    ],
+    [
+     720,
+     560
+    ],
+    [
+     538,
+     560
+    ],
+    [
+     538,
+     370
+    ],
+    [
+     370,
+     370
+    ]
+   ],
+   "printed_dims_ft": null,
+   "area_sqft": 138.9,
+   "verified": true,
+   "confidence": 0.86,
+   "flags": [
+    "no_printed_dims"
+   ]
+  }
+ ],
+ "doors": [
+  {
+   "id": "d1",
+   "center": [
+    725,
+    470
+   ],
+   "width_ft": 3.0,
+   "hinge": "right"
+  },
+  {
+   "id": "d2",
+   "center": [
+    445,
+    375
+   ],
+   "width_ft": 2.5,
+   "hinge": "left"
+  }
+ ],
+ "windows": [
+  {
+   "id": "w1",
+   "center": [
+    160,
+    35
+   ],
+   "on_exterior_wall": true
+  },
+  {
+   "id": "w2",
+   "center": [
+    320,
+    35
+   ],
+   "on_exterior_wall": true
+  },
+  {
+   "id": "w3",
+   "center": [
+    580,
+    35
+   ],
+   "on_exterior_wall": true
+  },
+  {
+   "id": "w4",
+   "center": [
+    35,
+    440
+   ],
+   "on_exterior_wall": true
+  }
+ ],
+ "entrance": [
+  725,
+  470
+ ],
+ "area": {
+  "from_printed": 673,
+  "from_geometry": 836,
+  "listing_claim": 950,
+  "claim_scope": "same_floor",
+  "printed_coverage": 0.81
+ },
+ "alignment_score_history": [
+  0.61,
+  0.88,
+  0.94
+ ],
+ "answers": {
+  "king_bed_fits": {
+   "room": "r6",
+   "fits": false,
+   "reason": "King bed 6.3\u00d76.7 ft + 3 ft clearance on 3 sides needs 12.3\u00d79.7 ft; room is 7.9\u00d79.0 ft"
+  },
+  "clear_path": [
+   {
+    "from": "r2",
+    "to": "entrance",
+    "ok": true,
+    "reason": null,
+    "path": [
+     [
+      580,
+      170
+     ],
+     [
+      580,
+      340
+     ],
+     [
+      640,
+      340
+     ],
+     [
+      640,
+      470
+     ],
+     [
+      725,
+      470
+     ]
+    ]
+   },
+   {
+    "from": "r6",
+    "to": "entrance",
+    "ok": true,
+    "reason": null,
+    "path": [
+     [
+      450,
+      470
+     ],
+     [
+      450,
+      340
+     ],
+     [
+      640,
+      340
+     ],
+     [
+      640,
+      470
+     ],
+     [
+      725,
+      470
+     ]
+    ]
+   }
+  ],
+  "legal_bedrooms": [
+   {
+    "room": "r2",
+    "legal": true,
+    "checks": {
+     "area_ge_80": true,
+     "min_width_ge_8ft": true,
+     "exterior_window": true,
+     "ceiling_height": "not_checkable_from_plan"
+    },
+    "reason": "176 sq ft, 13.0 ft narrowest width, window on exterior wall"
+   },
+   {
+    "room": "r6",
+    "legal": false,
+    "checks": {
+     "area_ge_80": false,
+     "min_width_ge_8ft": false,
+     "exterior_window": false,
+     "ceiling_height": "not_checkable_from_plan"
+    },
+    "reason": "71 sq ft < 80 sq ft minimum; 7.9 ft narrowest width < 8 ft; no window on an exterior wall"
+   }
+  ],
+  "custom_query": null
+ },
+ "decision_checks": [
+  {
+   "room": "r1",
+   "question": "Does the outline enclose exactly one room?",
+   "p_yes": 0.97
+  },
+  {
+   "room": "r1",
+   "question": "Is the room's label inside the outline?",
+   "p_yes": 0.99
+  },
+  {
+   "room": "r1",
+   "question": "Does the outline stop at the walls?",
+   "p_yes": 0.94
+  },
+  {
+   "room": "r2",
+   "question": "Does the outline enclose exactly one room?",
+   "p_yes": 0.98
+  },
+  {
+   "room": "r2",
+   "question": "Is the room's label inside the outline?",
+   "p_yes": 0.99
+  },
+  {
+   "room": "r2",
+   "question": "Does the outline stop at the walls?",
+   "p_yes": 0.96
+  },
+  {
+   "room": "r2",
+   "question": "Is there a window on an exterior wall of this room?",
+   "p_yes": 0.97
+  },
+  {
+   "room": "r3",
+   "question": "Does the outline enclose exactly one room?",
+   "p_yes": 0.95
+  },
+  {
+   "room": "r3",
+   "question": "Is the room's label inside the outline?",
+   "p_yes": 0.98
+  },
+  {
+   "room": "r3",
+   "question": "Does the outline stop at the walls?",
+   "p_yes": 0.91
+  },
+  {
+   "room": "r4",
+   "question": "Does the outline enclose exactly one room?",
+   "p_yes": 0.96
+  },
+  {
+   "room": "r4",
+   "question": "Is the room's label inside the outline?",
+   "p_yes": 0.97
+  },
+  {
+   "room": "r4",
+   "question": "Does the outline stop at the walls?",
+   "p_yes": 0.9
+  },
+  {
+   "room": "r5",
+   "question": "Does the outline enclose exactly one room?",
+   "p_yes": 0.71
+  },
+  {
+   "room": "r5",
+   "question": "Is the room's label inside the outline?",
+   "p_yes": 0.64
+  },
+  {
+   "room": "r5",
+   "question": "Does the outline stop at the walls?",
+   "p_yes": 0.38
+  },
+  {
+   "room": "r6",
+   "question": "Does the outline enclose exactly one room?",
+   "p_yes": 0.97
+  },
+  {
+   "room": "r6",
+   "question": "Is the room's label inside the outline?",
+   "p_yes": 0.98
+  },
+  {
+   "room": "r6",
+   "question": "Does the outline stop at the walls?",
+   "p_yes": 0.95
+  },
+  {
+   "room": "r6",
+   "question": "Is there a window on an exterior wall of this room?",
+   "p_yes": 0.06
+  },
+  {
+   "room": "r7",
+   "question": "Does the outline enclose exactly one room?",
+   "p_yes": 0.88
+  },
+  {
+   "room": "r7",
+   "question": "Is the room's label inside the outline?",
+   "p_yes": 0.82
+  },
+  {
+   "room": "r7",
+   "question": "Does the outline stop at the walls?",
+   "p_yes": 0.86
+  }
+ ],
+ "cost_usd": 0.0184,
+ "timings_ms": {
+  "parse": 5200,
+  "geometry": 410,
+  "verify": 8300,
+  "solvers": 160
+ }
+}

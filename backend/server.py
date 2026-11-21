@@ -184,8 +184,14 @@ def health():
 
 
 @app.post("/analyze")
-def analyze(file: UploadFile = File(...)):
-    data = file.file.read()
+def analyze(file: UploadFile | None = File(None), image: UploadFile | None = File(None)):
+    """Plan image as multipart field "file" (contract) or "image" (what frontend/index.html sends)."""
+    upload = file or image
+    if upload is None:
+        model = _empty_model(uuid.uuid4().hex[:12])
+        model["errors"].append({"stage": "upload", "error": "send the plan as multipart field 'file' (or 'image')"})
+        return JSONResponse(model, status_code=400)
+    data = upload.file.read()
     key = _cache_key(data) if data else None
     hit = _cache_get(key) if key else None
     if hit is not None:  # same image bytes + same pipeline code as an earlier clean live run
@@ -515,12 +521,24 @@ def _fit_and_path(model, w_ft, d_ft, clearance_ft, room_label):
         return out
     out["room"], out["label"] = room["id"], room.get("label")
     scale, doors = model["scale_px_per_ft"], model["doors"]
-    out["fit"] = _run(out, "fit", solvers.fit, room, w_ft, d_ft, clearance_ft, doors, scale)
+    out["fit"] = _with_pose(_run(out, "fit", solvers.fit, room, w_ft, d_ft, clearance_ft, doors, scale), w_ft, d_ft, scale)
     placed = (out["fit"] or {}).get("placement")
     paths = _run(out, "clear_path", solvers.clear_path, model["rooms"], doors, model["entrance"], scale,
                  [placed] if placed else None)
     out["clear_path"] = _path_summary(paths) if paths is not None else None
     return out
+
+
+def _with_pose(fit, w_ft, d_ft, scale):
+    """Add center_px + rotation_deg (what the frontend draws: a w×d rect, w along x at 0°, rotated about
+    its centre) to a fit that has a placement. rotation_deg = 90 when the solver turned the object."""
+    p = (fit or {}).get("placement")
+    if not p or not scale:
+        return fit
+    xs, ys = [q[0] for q in p], [q[1] for q in p]
+    x_extent = max(xs) - min(xs)
+    rot = 0 if abs(x_extent - w_ft * scale) <= abs(x_extent - d_ft * scale) else 90
+    return {**fit, "center_px": [round(sum(xs) / len(xs), 1), round(sum(ys) / len(ys), 1)], "rotation_deg": rot}
 
 
 def _find_room(rooms, label):
